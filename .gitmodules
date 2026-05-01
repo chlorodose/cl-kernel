@@ -1,0 +1,18 @@
+[submodule "source/kernel"]
+	path = source/kernel
+	url = https://github.com/torvalds/linux.git
+[submodule "source/zfs"]
+	path = source/zfs
+	url = https://github.com/openzfs/zfs.git
+[submodule "source/nvidia"]
+	path = source/nvidia
+	url = https://github.com/NVIDIA/open-gpu-kernel-modules.git
+[submodule "source/cachy"]
+	path = source/cachy
+	url = https://github.com/CachyOS/kernel-patches.git
+[submodule "source/xanmod"]
+	path = source/xanmod
+	url = https://gitlab.com/xanmod/linux-patches.git
+[submodule "source/bcachefs"]
+	path = source/bcachefs
+	url = https://github.com/koverstreet/bcachefs.git

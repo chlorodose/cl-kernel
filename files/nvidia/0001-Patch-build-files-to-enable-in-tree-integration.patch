@@ -1,0 +1,181 @@
+From 2654e6c8eb87a5761dd864250503e744ccee3eed Mon Sep 17 00:00:00 2001
+From: chlorodose <chlorodose@chlorodose.me>
+Date: Fri, 1 May 2026 21:58:44 +0800
+Subject: [PATCH] Patch build files to enable in-tree integration
+
+---
+ copy-builtin        | 34 ++++++++++++++++++++++++++++++++++
+ kernel-open/Kbuild  | 45 ++++++++++++++++++++++++++++++++++++++++++---
+ kernel-open/Kconfig | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 121 insertions(+), 3 deletions(-)
+ create mode 100755 copy-builtin
+ create mode 100644 kernel-open/Kconfig
+
+diff --git a/copy-builtin b/copy-builtin
+new file mode 100755
+index 0000000..8d0eda6
+--- /dev/null
++++ b/copy-builtin
+@@ -0,0 +1,34 @@
++
++#!/bin/sh
++
++set -ef
++
++usage()
++{
++	echo "usage: $0 <kernel source tree>" >&2
++	exit 1
++}
++
++if ! [ -d "$1" ] ; then
++	usage
++fi
++KERNEL_DIR="$(realpath "$1")"
++cd "$(dirname "$0")"
++
++if [ ! -f "$KERNEL_DIR"/Module.symvers ]; then
++    echo "Error: Module.symvers not found. Please make kernel first and then call this script" >&2
++    exit 1
++fi
++
++cp -r . "$KERNEL_DIR"/drivers/video/nvidia
++printf '!.*\n!*\n' | cat - .gitignore >"$KERNEL_DIR"/drivers/video/nvidia/.gitignore
++echo '!conftest/' >>"$KERNEL_DIR"/drivers/video/nvidia/kernel-open/.gitignore
++
++sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
++echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
++
++cd "$KERNEL_DIR"
++./scripts/config \
++    --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
++make olddefconfig
++make drivers/video/nvidia/kernel-open/conftest/.all-conftests.o $MAKEOPTS
+diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
+index 089c77d..4440c84 100644
+--- a/kernel-open/Kbuild
++++ b/kernel-open/Kbuild
+@@ -2,6 +2,32 @@
+ # Kbuild file for NVIDIA Linux GPU driver kernel modules
+ ###########################################################################
+ 
++export IGNORE_MISSING_MODULE_SYMVERS := 1
++NV_KERNEL_SOURCES   := $(shell realpath "$(srctree)")
++NV_KERNEL_OUTPUT    := $(shell realpath "$(objtree)")
++NV_SPECTRE_V2       := 0
++ccflags-y           += $(shell echo '$$(info $$(CFLAGS))' | $(MAKE) -C "$(src)/.." -f utils.mk -f - 2>/dev/null | tr ' ' '\n' | grep -E '^-DNV_' | tr '\n' ' ')
++
++ifeq ($(CONFIG_NVIDIA),m)
++  NV_KERNEL_MODULES += nvidia
++endif
++ifeq ($(CONFIG_NVIDIA_DRM),m)
++  NV_KERNEL_MODULES += nvidia-drm
++endif
++ifeq ($(CONFIG_NVIDIA_MODESET),m)
++  NV_KERNEL_MODULES += nvidia-modeset
++endif
++ifeq ($(CONFIG_NVIDIA_PEERMEM),m)
++  NV_KERNEL_MODULES += nvidia-peermem
++endif
++ifeq ($(CONFIG_NVIDIA_UVM),m)
++  NV_KERNEL_MODULES += nvidia-uvm
++endif
++
++ifeq ($(realpath $(src)),$(realpath $(obj)))
++  NV_INTREE_BUILD := 1
++endif
++
+ #
+ # The parent makefile is expected to define:
+ #
+@@ -75,8 +101,8 @@ $(foreach _module, $(NV_KERNEL_MODULES), \
+  $(eval include $(src)/$(_module)/$(_module).Kbuild))
+ 
+ 
+-ccflags-y += -I$(src)/common/inc
+-ccflags-y += -I$(src)
++ccflags-y += -I$(realpath $(src))/common/inc
++ccflags-y += -I$(realpath $(src))
+ ccflags-y += -Wall $(DEFINES) $(INCLUDES) -Wno-cast-qual -Wno-format-extra-args
+ ccflags-y += -D__KERNEL__ -DMODULE -DNVRM
+ ccflags-y += -DNV_VERSION_STRING=\"595.71.05\"
+@@ -268,7 +294,6 @@ $(foreach header,$(NV_HEADER_PRESENCE_TESTS),$(eval $(call NV_HEADER_PRESENCE_CH
+ $(obj)/conftest/headers.h: $(call NV_HEADER_PRESENCE_PART,$(NV_HEADER_PRESENCE_TESTS))
+ 	@cat $^ > $@
+ 
+-clean-dirs := $(obj)/conftest
+ 
+ 
+ # For any object files that depend on conftest, declare the dependency here.
+@@ -305,3 +330,17 @@ $(obj)/conftest/uts_release: NV_GENERATE_UTS_RELEASE
+ .PHONY: NV_GENERATE_UTS_RELEASE
+ 
+ $(NV_CONFTEST_HEADERS): $(obj)/conftest/uts_release
++
++$(obj)/conftest/.all-conftests.o: $(NV_CONFTEST_HEADERS)
++
++$(obj)/nvidia/nv-kernel.o_binary: $(NV_CONFTEST_HEADERS)
++	$(MAKE) -C "$(src)/.." kernel-open/nvidia/nv-kernel.o_binary
++	@if [ -z "$(NV_INTREE_BUILD)" ]; then \
++		ln -s "$(src)/nvidia/nv-kernel.o_binary" "$(obj)/nvidia/nv-kernel.o_binary" ;\
++	fi
++
++$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary: $(NV_CONFTEST_HEADERS)
++	$(MAKE) -C "$(src)/.." kernel-open/nvidia-modeset/nv-modeset-kernel.o_binary
++	@if [ -z "$(NV_INTREE_BUILD)" ]; then \
++	    ln -s "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary" ;\
++	fi
+diff --git a/kernel-open/Kconfig b/kernel-open/Kconfig
+new file mode 100644
+index 0000000..4138555
+--- /dev/null
++++ b/kernel-open/Kconfig
+@@ -0,0 +1,45 @@
++config NVIDIA
++    tristate "NVIDIA GPU opensource driver (GSP RM)"
++    depends on m
++    depends on PCI && 64BIT
++    select FW_LOADER
++    select I2C
++    help
++      NVIDIA official open-source GPU driver based on the GPU System Processor (GSP).
++      This driver provides the core 'nvidia.ko' resource manager module.
++      Currently, this driver only supports 64-bit architectures (x86_64, aarch64).
++
++config NVIDIA_MODESET
++    tristate "NVIDIA GPU opensource driver - MODESET"
++    depends on NVIDIA
++    help
++      NVIDIA display modesetting module (nvidia-modeset.ko).
++      This module bridges the core RM and the DRM subsystem for display control.
++
++config NVIDIA_DRM
++    tristate "NVIDIA GPU opensource driver - DRM"
++    depends on NVIDIA
++    depends on DRM
++    select DRM_KMS_HELPER
++    select NVIDIA_MODESET
++    help
++      NVIDIA Direct Rendering Manager interface (nvidia-drm.ko).
++      Provides standard Linux DRM/KMS interfaces to userspace compositors
++      (Wayland/X11).
++
++config NVIDIA_UVM
++    tristate "NVIDIA GPU opensource driver - UVM (Unified Memory)"
++    depends on NVIDIA
++    depends on MMU
++    help
++      NVIDIA Unified Memory driver (nvidia-uvm.ko).
++      Required for CUDA unified memory, providing a shared memory space
++      between CPU and GPU.
++
++config NVIDIA_PEERMEM
++    tristate "NVIDIA GPU opensource driver - PEERMEM"
++    depends on NVIDIA
++    help
++      NVIDIA Peer-to-Peer memory support (nvidia-peermem.ko).
++      Allows third-party devices (like InfiniBand NICs) to directly access
++      GPU memory via RDMA.
+-- 
+2.52.0
+
