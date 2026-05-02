@@ -1,0 +1,45 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release Tag Name (e.g., v1.0.0)"
+        required: true
+      release_name:
+        description: "Release Name"
+        required: true
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: 1
+
+      - name: Run build script
+        run: |
+          mkdir build && cd build
+          ../build-kernel-src
+          mv cl-kernel.tar.zst ../source.tar.zst
+          mv cl-kernel.patch.zst ../from-upstream.patch.zst
+
+      - name: Create Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          name: ${{ github.event.inputs.release_name }}
+          draft: false
+          prerelease: false
+          files: |
+            source.tar.zst
+            from-upstream.patch.zst
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

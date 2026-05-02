@@ -1,0 +1,25 @@
+From 1c042d81738df84e0578aef9a9f08f965fc4ec91 Mon Sep 17 00:00:00 2001
+From: chlorodose <chlorodose@chlorodose.me>
+Date: Sun, 3 May 2026 11:29:24 +0000
+Subject: [PATCH] Fixup aufs-m missing symbols
+
+---
+ fs/namespace.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/fs/namespace.c b/fs/namespace.c
+index 854f4fc66..34accbf3f 100644
+--- a/fs/namespace.c
++++ b/fs/namespace.c
+@@ -6499,3 +6499,8 @@ static int __init init_fs_namespace_sysctls(void)
+ fs_initcall(init_fs_namespace_sysctls);
+ 
+ #endif /* CONFIG_SYSCTL */
++
++#if IS_MODULE(CONFIG_AUFS_FS)
++EXPORT_SYMBOL_GPL(collect_paths);
++EXPORT_SYMBOL_GPL(drop_collected_paths);
++#endif
+-- 
+2.54.0
+

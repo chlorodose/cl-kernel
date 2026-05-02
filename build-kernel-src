@@ -4,35 +4,42 @@ SOURCE_DIR="$(dirname "$(realpath "$0")")/source"
 FILES_DIR="$(dirname "$(realpath "$0")")/files"
 
 # Install Kernel
-rm -rf kernel && cp -a "$SOURCE_DIR"/kernel kernel && pushd kernel
+rm -rf kernel && git clone "$SOURCE_DIR"/kernel kernel && pushd kernel
     PATCH_LIST="
         $(find "$SOURCE_DIR"/xanmod/linux-7.0.y-xanmod -type f -name '*.patch' | sort)
         $(ls "$SOURCE_DIR"/cachy/7.0/misc/{0001-acpi-call.patch,0001-aufs*.patch,0001-cgroup-vram.patch,0001-clang-polly.patch})
+        $FILES_DIR/cachy/0001-Fixup-aufs-m-missing-symbols.patch
     "
     for PATCH in $PATCH_LIST; do
         echo "Patching: $PATCH" >&2
-        git --git-dir="$SOURCE_DIR"/kernel/.git --work-tree=. apply "$PATCH"
+        git apply "$PATCH"
     done
+    make defconfig
+    ./scripts/config \
+        --enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE --enable ZONE_DEVICE --enable DEVICE_PRIVATE
+    if [ ! -z "$TEST_CONFIG_PATH" ]; then
+        cat "$TEST_CONFIG_PATH" >.config
+    fi
     make olddefconfig
     make $MAKEOPTS
 popd
 KERNEL_DIR="$(realpath kernel)"
 
 # Install NVIDIA
-rm -rf nvidia && cp -a "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
+rm -rf nvidia && git clone "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
     PATCH_LIST="
         $(find "$SOURCE_DIR"/cachy/7.1/misc/nvidia -type f -name '*.patch' | grep -v '0005-HACK-kernel-open-Makefile-Remove-PAHOLE_VARIABLE.patch' | sort)
-        $FILES_DIR/nvidia/0001-Patch-build-files-to-enable-in-tree-integration.patch
+        $FILES_DIR/nvidia/0001-Enable-in-tree-build.patch
     "
     for PATCH in $PATCH_LIST; do
         echo "Patching: $PATCH" >&2
-        git --git-dir="$SOURCE_DIR"/nvidia/.git --work-tree=. apply "$PATCH"
+        git apply "$PATCH"
     done
     ./copy-builtin "$KERNEL_DIR"
 popd
 
 # Install zfs
-rm -rf zfs && cp -a "$SOURCE_DIR"/zfs zfs && pushd zfs
+rm -rf zfs && git clone "$SOURCE_DIR"/zfs zfs && pushd zfs
     sed -i 's/CDDL/GPL/g' META # Evil, i know...
     sed -i 's/\/Kbuild//g' module/.gitignore
     echo >include/.gitignore
@@ -43,7 +50,7 @@ rm -rf zfs && cp -a "$SOURCE_DIR"/zfs zfs && pushd zfs
 popd
 
 # Install bcachefs
-rm -rf bcachefs && cp -a "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
+rm -rf bcachefs && git clone "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
     bash "$FILES_DIR"/bcachefs/copy-builtin.sh "$KERNEL_DIR"
 popd
 
@@ -54,7 +61,10 @@ pushd kernel
     ./scripts/config \
         --module ZFS \
         --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
-        --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
+        --enable PCI --enable DRM --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
+    if [ ! -z "$TEST_CONFIG_PATH" ]; then
+        cat "$TEST_CONFIG_PATH" >.config
+    fi
     make olddefconfig
     if [ -z "$SKIP_TEST" ]; then
         make $MAKEOPTS
@@ -64,13 +74,12 @@ popd
 # Clean KernelTree
 pushd kernel
     make mrproper
-    find . -name '.git' -exec rm -rf {} \;
-    git --git-dir="$SOURCE_DIR"/kernel/.git --work-tree=. clean -Xdf
-    git --git-dir="$SOURCE_DIR"/kernel/.git --work-tree=. add .
+    git clean -Xdf
+    git add .
 popd
 
 # Package Source
 rm -f cl-kernel.tar.zst cl-kernel.patch.zst
-tar --transform "s/^kernel/linux-$(make -C kernel kernelversion | grep -E '([0-9]*)\.([0-9]*)\.([0-9]*)')/" -cf - kernel | \
-    zstd -T0 --long --ultra -22 --progress -o cl-kernel.tar.zst
-git -C kernel --git-dir="$SOURCE_DIR"/kernel/.git --work-tree=. diff --cached | zstd -T0 --long --ultra -22 --progress -o cl-kernel.patch.zst
+tar --exclude=.git --transform "s/^kernel/linux-$(make -C kernel kernelversion | grep -E '([0-9]*)\.([0-9]*)\.([0-9]*)')/" -cf source.tar kernel
+git -C kernel diff --cached >from-upstream.patch
+zstd -T0 --long --ultra -22 --progress --rm source.tar from-upstream.patch

@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+cd "$(dirname "$0")/source"
+
+for D in *; do
+    if [ "$D" != "kernel" ]; then
+        echo "Fetching $D"
+        git -C "$D" fetch origin
+    fi
+done
+
+git -C bcachefs checkout "$(curl -fsL https://raw.githubusercontent.com/koverstreet/bcachefs-tools/refs/heads/master/.bcachefs_revision)"
+git -C cachy checkout master
+git -C xanmod checkout master
+git -C zfs checkout master
+# git -C nvidia # Manually update
