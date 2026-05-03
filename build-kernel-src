@@ -51,6 +51,13 @@ popd
 
 # Install bcachefs
 rm -rf bcachefs && git clone "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
+    PATCH_LIST="
+        $FILES_DIR/bcachefs/0001-Fix-security-labels-support.patch
+    "
+    for PATCH in $PATCH_LIST; do
+        echo "Patching: $PATCH" >&2
+        git apply "$PATCH"
+    done
     bash "$FILES_DIR"/bcachefs/copy-builtin.sh "$KERNEL_DIR"
 popd
 
