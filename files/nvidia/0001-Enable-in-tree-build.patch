@@ -1,15 +1,15 @@
-From 12fba22f9a96cc628a1bb0d467547b3e83b6e6ef Mon Sep 17 00:00:00 2001
+From a4214194713724eee0535eeea3271067a54da0f2 Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
 Date: Sun, 3 May 2026 15:24:11 +0800
 Subject: [PATCH] Enable in tree build
 
 ---
  .gitignore              |  1 +
- copy-builtin            | 30 +++++++++++++++++++++++++
- kernel-open/Kbuild      | 50 ++++++++++++++++++++++++++++++++++++-----
- kernel-open/Kconfig     | 46 +++++++++++++++++++++++++++++++++++++
- kernel-open/conftest.sh |  5 ++++-
- 5 files changed, 126 insertions(+), 6 deletions(-)
+ copy-builtin            | 30 ++++++++++++++++
+ kernel-open/Kbuild      | 76 ++++++++++++++++++++++++++++++++++++-----
+ kernel-open/Kconfig     | 46 +++++++++++++++++++++++++
+ kernel-open/conftest.sh |  6 ++--
+ 5 files changed, 148 insertions(+), 11 deletions(-)
  create mode 100755 copy-builtin
  create mode 100644 kernel-open/Kconfig
 
@@ -59,10 +59,10 @@ index 0000000..7a53fe8
 +sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
 +echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
 diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
-index 089c77d..83c5886 100644
+index 089c77d..c779103 100644
 --- a/kernel-open/Kbuild
 +++ b/kernel-open/Kbuild
-@@ -2,6 +2,33 @@
+@@ -2,6 +2,36 @@
  # Kbuild file for NVIDIA Linux GPU driver kernel modules
  ###########################################################################
  
@@ -72,6 +72,9 @@ index 089c77d..83c5886 100644
 +NV_KERNEL_OUTPUT    := $(shell realpath "$(objtree)")
 +NV_SPECTRE_V2       := 0
 +ccflags-y           += $(shell echo '$$(info $$(CFLAGS))' | $(MAKE) -C "$(src)/.." -f utils.mk -f - 2>/dev/null | tr ' ' '\n' | grep -E '^-DNV_' | tr '\n' ' ')
++
++NV_ROOT 			:= $(realpath $(src)/..)
++CXX					?= $(if $(LLVM),clang++,$(CROSS_COMPILE)g++)
 +
 +ifeq ($(CONFIG_NVIDIA),m)
 +  NV_KERNEL_MODULES += nvidia
@@ -96,7 +99,7 @@ index 089c77d..83c5886 100644
  #
  # The parent makefile is expected to define:
  #
-@@ -75,8 +102,8 @@ $(foreach _module, $(NV_KERNEL_MODULES), \
+@@ -75,8 +105,8 @@ $(foreach _module, $(NV_KERNEL_MODULES), \
   $(eval include $(src)/$(_module)/$(_module).Kbuild))
  
  
@@ -107,16 +110,35 @@ index 089c77d..83c5886 100644
  ccflags-y += -Wall $(DEFINES) $(INCLUDES) -Wno-cast-qual -Wno-format-extra-args
  ccflags-y += -D__KERNEL__ -DMODULE -DNVRM
  ccflags-y += -DNV_VERSION_STRING=\"595.71.05\"
-@@ -210,7 +237,7 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
- $(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
+@@ -207,11 +237,13 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
+ # file, which is included in the compile test preamble.
+ #
+ 
+-$(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
++quiet_cmd_conftest	= CONFTEST	 $(notdir $*)
++      cmd_conftest	= MODULE_SYMVERS_PATHS="$(realpath $(obj)/linux.symvers)" $(NV_CONFTEST_CMD) \
++      					compile_tests '$(NV_CONFTEST_CFLAGS)' $(notdir $*) > $@
++
++$(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER) $(obj)/linux.symvers FORCE
  	@mkdir -p $(obj)/conftest/compile-tests
- 	@echo " CONFTEST: $(notdir $*)"
+-	@echo " CONFTEST: $(notdir $*)"
 -	@$(NV_CONFTEST_CMD) compile_tests '$(NV_CONFTEST_CFLAGS)' \
-+	@MODULE_SYMVERS_PATHS="$(realpath $(obj)/../linux.symvers)" $(NV_CONFTEST_CMD) compile_tests '$(NV_CONFTEST_CFLAGS)' \
- 	 $(notdir $*) > $@
+-	 $(notdir $*) > $@
++	$(call if_changed,conftest)
  
  #
-@@ -268,8 +295,7 @@ $(foreach header,$(NV_HEADER_PRESENCE_TESTS),$(eval $(call NV_HEADER_PRESENCE_CH
+ # Concatenate a conftest/*.h header from its constituent compile test headers
+@@ -221,7 +253,8 @@ $(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
+ #
+ 
+ define NV_GENERATE_COMPILE_TEST_HEADER
+- $(obj)/conftest/$(1).h: $(addprefix $(obj)/conftest/compile-tests/,$(addsuffix .h,$(2)))
++targets += $(addprefix conftest/compile-tests/,$(addsuffix .h,$(2)))
++$(obj)/conftest/$(1).h: $(addprefix $(obj)/conftest/compile-tests/,$(addsuffix .h,$(2)))
+ 	@mkdir -p $(obj)/conftest
+ 	@# concatenate /dev/null to prevent cat from hanging when $$^ is empty
+ 	@cat $$^ /dev/null > $$@
+@@ -268,8 +301,7 @@ $(foreach header,$(NV_HEADER_PRESENCE_TESTS),$(eval $(call NV_HEADER_PRESENCE_CH
  $(obj)/conftest/headers.h: $(call NV_HEADER_PRESENCE_PART,$(NV_HEADER_PRESENCE_TESTS))
  	@cat $^ > $@
  
@@ -126,24 +148,36 @@ index 089c77d..83c5886 100644
  
  # For any object files that depend on conftest, declare the dependency here.
  $(addprefix $(obj)/,$(NV_OBJECTS_DEPEND_ON_CONFTEST)): | $(NV_CONFTEST_HEADERS)
-@@ -305,3 +331,17 @@ $(obj)/conftest/uts_release: NV_GENERATE_UTS_RELEASE
+@@ -305,3 +337,29 @@ $(obj)/conftest/uts_release: NV_GENERATE_UTS_RELEASE
  .PHONY: NV_GENERATE_UTS_RELEASE
  
  $(NV_CONFTEST_HEADERS): $(obj)/conftest/uts_release
 +
-+$(obj)/conftest/.all-conftests.o: $(NV_CONFTEST_HEADERS)
++$(obj)/linux.symvers:
++	@cp -sf "$(realpath $(src)/../linux.symvers)" $(obj)/linux.symvers
 +
-+$(obj)/nvidia/nv-kernel.o_binary: $(NV_CONFTEST_HEADERS)
-+	@$(MAKE) -C "$(src)/.." kernel-open/nvidia/nv-kernel.o_binary
-+	@if [ -z "$(NV_INTREE_BUILD)" ]; then \
-+		ln -s "$(src)/nvidia/nv-kernel.o_binary" "$(obj)/nvidia/nv-kernel.o_binary" ;\
-+	fi
++targets += nvidia/nv-kernel.o_binary nvidia-modeset/nv-modeset-kernel.o_binary
 +
-+$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary: $(NV_CONFTEST_HEADERS)
-+	@$(MAKE) -C "$(src)/.." kernel-open/nvidia-modeset/nv-modeset-kernel.o_binary
-+	@if [ -z "$(NV_INTREE_BUILD)" ]; then \
-+	    ln -s "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary" ;\
-+	fi
++quiet_cmd_nvmake-m	= MAKE [M]	$@
++      cmd_nvmake-m	= env \
++		-u CXXFLAGS \
++		CPPFLAGS="$(KCPPFLAGS)" \
++		AS="$(AS)" AFLAGS="$(KAFLAGS) $(AFLAGS_MODULE)" \
++		CC="$(CC)" CFLAGS="$(KCFLAGS) $(CFLAGS_MODULE)" \
++		RUSTC="$(RUSTC)" RUSTFLAGS="$(KRUSTFLAGS) $(RUSTFLAGS_MODULE)" \
++		LD="$(LD)" LDFLAGS="$(KBUILD_LDFLAGS)" \
++		CXX="$(CXX)" \
++		$(MAKE) -C "$(NV_ROOT)" $(patsubst $(obj)/%,kernel-open/%,$@)
++
++$(obj)/nvidia/nv-kernel.o_binary: $(NV_CONFTEST_HEADERS) FORCE
++	$(call if_changed,nvmake-$(CONFIG_NVIDIA),kernel-open/nvidia/nv-kernel.o_binary)
++	$(Q)[ "$(src)/nvidia/nv-kernel.o_binary" -ef "$(obj)/nvidia/nv-kernel.o_binary" ] || \
++		cp -s "$(src)/nvidia/nv-kernel.o_binary" "$(obj)/nvidia/nv-kernel.o_binary"
++
++$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary: $(NV_CONFTEST_HEADERS) FORCE
++	$(call if_changed,nvmake-$(CONFIG_NVIDIA_MODESET),kernel-open/nvidia-modeset/nv-modeset-kernel.o_binary)
++	$(Q)[ "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" -ef "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary" ] || \
++	    cp -s "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary"
 diff --git a/kernel-open/Kconfig b/kernel-open/Kconfig
 new file mode 100644
 index 0000000..23119d7
@@ -197,7 +231,7 @@ index 0000000..23119d7
 +      Allows third-party devices (like InfiniBand NICs) to directly access
 +      GPU memory via RDMA.
 diff --git a/kernel-open/conftest.sh b/kernel-open/conftest.sh
-index cb4da27..5a84fc2 100755
+index cb4da27..2826bf9 100755
 --- a/kernel-open/conftest.sh
 +++ b/kernel-open/conftest.sh
 @@ -15,7 +15,6 @@ XEN_PRESENT=1
@@ -208,7 +242,15 @@ index cb4da27..5a84fc2 100755
  
  # Also search in out-of-tree Module.symvers on Tegra
  if [ -d ${NVIDIA_OOT_PATH} ]; then
-@@ -335,6 +334,10 @@ check_symbol_exists() {
+@@ -103,7 +102,6 @@ test_header_presence() {
+ build_cflags() {
+     ISYSTEM=`$CC -print-file-name=include 2> /dev/null`
+     BASE_CFLAGS="-O2 -D__KERNEL__ \
+--DKBUILD_BASENAME=\"#conftest$$\" -DKBUILD_MODNAME=\"#conftest$$\" \
+ -nostdinc -isystem $ISYSTEM \
+ -Wno-implicit-function-declaration -Wno-strict-prototypes"
+ 
+@@ -335,6 +333,10 @@ check_symbol_exists() {
      TAB='	'
  
      if [ ${OS_FREEBSD} -ne 1 ] ; then
