@@ -1,4 +1,4 @@
-From a4214194713724eee0535eeea3271067a54da0f2 Mon Sep 17 00:00:00 2001
+From 9d9eb439c9b3143f94580edc805877de942c1548 Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
 Date: Sun, 3 May 2026 15:24:11 +0800
 Subject: [PATCH] Enable in tree build
@@ -7,9 +7,9 @@ Subject: [PATCH] Enable in tree build
  .gitignore              |  1 +
  copy-builtin            | 30 ++++++++++++++++
  kernel-open/Kbuild      | 76 ++++++++++++++++++++++++++++++++++++-----
- kernel-open/Kconfig     | 46 +++++++++++++++++++++++++
+ kernel-open/Kconfig     | 47 +++++++++++++++++++++++++
  kernel-open/conftest.sh |  6 ++--
- 5 files changed, 148 insertions(+), 11 deletions(-)
+ 5 files changed, 149 insertions(+), 11 deletions(-)
  create mode 100755 copy-builtin
  create mode 100644 kernel-open/Kconfig
 
@@ -180,10 +180,10 @@ index 089c77d..c779103 100644
 +	    cp -s "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary"
 diff --git a/kernel-open/Kconfig b/kernel-open/Kconfig
 new file mode 100644
-index 0000000..23119d7
+index 0000000..c3747b7
 --- /dev/null
 +++ b/kernel-open/Kconfig
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,47 @@
 +config NVIDIA
 +    tristate "NVIDIA GPU opensource driver (GSP RM)"
 +    depends on m
@@ -206,6 +206,7 @@ index 0000000..23119d7
 +    tristate "NVIDIA GPU opensource driver - DRM"
 +    depends on NVIDIA
 +    depends on DRM
++    depends on DEVICE_PRIVATE
 +    select DRM_KMS_HELPER
 +    select NVIDIA_MODESET
 +    help

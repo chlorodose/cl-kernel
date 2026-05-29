@@ -70,7 +70,7 @@ pushd kernel
     ./scripts/config \
         --module ZFS \
         --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
-        --enable PCI --enable DRM --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
+        --enable PCI --enable DRM --enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE --enable ZONE_DEVICE --enable DEVICE_PRIVATE --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
     if [ ! -z "$TEST_CONFIG_PATH" ]; then
         cat "$TEST_CONFIG_PATH" >.config
     fi
