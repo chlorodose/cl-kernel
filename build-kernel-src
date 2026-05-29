@@ -8,8 +8,8 @@ FILES_DIR="$(dirname "$(realpath "$0")")/files"
 # Install Kernel
 rm -rf kernel && git clone "$SOURCE_DIR"/kernel kernel && pushd kernel
     PATCH_LIST="
-        $(find "$SOURCE_DIR"/xanmod/linux-7.0.y-xanmod -type f -name '*.patch' | sort)
-        $(ls "$SOURCE_DIR"/cachy/7.0/misc/{0001-acpi-call.patch,0001-aufs*.patch,0001-cgroup-vram.patch,0001-clang-polly.patch})
+        $(find "$SOURCE_DIR"/xanmod/linux-7.0.y-xanmod -type f -name '*.patch' | grep -v -f "$FILES_DIR"/xanmod/patch.blacklist | sort)
+        $(ls "$SOURCE_DIR"/cachy/7.0/misc/{0001-aufs*.patch,0001-clang-polly.patch})
         $FILES_DIR/cachy/0001-Fixup-aufs-m-missing-symbols.patch
     "
     for PATCH in $PATCH_LIST; do
@@ -30,7 +30,7 @@ KERNEL_DIR="$(realpath kernel)"
 # Install NVIDIA
 rm -rf nvidia && git clone "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
     PATCH_LIST="
-        $(find "$SOURCE_DIR"/cachy/7.1/misc/nvidia -type f -name '*.patch' | grep -v '0005-HACK-kernel-open-Makefile-Remove-PAHOLE_VARIABLE.patch' | sort)
+        $(find "$SOURCE_DIR"/cachy/7.1/misc/nvidia -type f -name '*.patch' | grep -v -f "$FILES_DIR"/cachy/nvidia-patch.blacklist  | sort)
         $FILES_DIR/nvidia/0001-Enable-in-tree-build.patch
     "
     for PATCH in $PATCH_LIST; do
