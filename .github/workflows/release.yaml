@@ -24,10 +24,16 @@ jobs:
           submodules: "recursive"
           fetch-depth: 1
 
+      - name: Install tools
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves zstd autoconf automake libtool libtirpc-dev
+
       - name: Run build script
         run: |
           mkdir build && cd build
-          ../build-kernel-src
+          export MAKEOPTS="-j $(expr "$(nproc)" '+' 4) --load-average $(expr "$(nproc)" '+' 1)"
+          SKIP_TEST=1 ../build-kernel-src
           mv cl-kernel.tar.zst ../source.tar.zst
           mv cl-kernel.patch.zst ../from-upstream.patch.zst
 
