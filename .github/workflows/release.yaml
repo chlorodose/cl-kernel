@@ -27,7 +27,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt update
-          sudo apt install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves zstd autoconf automake libtool libtirpc-dev
+          sudo apt install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev dwarves zstd autoconf automake libtool libtirpc-dev rsync
 
       - name: Run build script
         run: |

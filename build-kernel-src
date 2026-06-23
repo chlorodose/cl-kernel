@@ -12,8 +12,8 @@ fi
 # Install Kernel
 rm -rf kernel && git clone "$SOURCE_DIR"/kernel kernel && pushd kernel
     PATCH_LIST="
-        $(find "$SOURCE_DIR"/xanmod/linux-7.0.y-xanmod -type f -name '*.patch' | grep -v -f "$FILES_DIR"/xanmod/patch.blacklist | sort)
-        $(ls "$SOURCE_DIR"/cachy/7.0/misc/{0001-aufs*.patch,0001-clang-polly.patch})
+        $(find "$SOURCE_DIR"/xanmod/linux-7.1.y-xanmod -type f -name '*.patch' | grep -v -f "$FILES_DIR"/xanmod/patch.blacklist | sort)
+        $(ls "$SOURCE_DIR"/cachy/7.1/misc/{0001-aufs*,0001-clang-polly}.patch)
         $FILES_DIR/cachy/0001-Fixup-aufs-m-missing-symbols.patch
     "
     for PATCH in $PATCH_LIST; do
@@ -58,7 +58,7 @@ popd
 # Install bcachefs
 rm -rf bcachefs && git clone "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
     PATCH_LIST="
-        $FILES_DIR/bcachefs/0001-Fix-security-labels-support.patch
+        $FILES_DIR/bcachefs/*.patch
     "
     for PATCH in $PATCH_LIST; do
         echo "Patching: $PATCH" >&2
@@ -72,8 +72,8 @@ pushd kernel
     make mrproper
     make olddefconfig
     ./scripts/config \
-        --module ZFS \
-        --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
+	--module ZFS \
+        --enable UNICODE --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
         --enable PCI --enable DRM --enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE --enable ZONE_DEVICE --enable DEVICE_PRIVATE --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
     if [ ! -z "$TEST_CONFIG_PATH" ]; then
         cat "$TEST_CONFIG_PATH" >.config
@@ -94,5 +94,5 @@ popd
 # Package Source
 rm -f cl-kernel.tar.zst cl-kernel.patch.zst
 tar --exclude=.git --transform "s/^kernel/linux-$(make -C kernel kernelversion | grep -E '([0-9]*)\.([0-9]*)\.([0-9]*)')/" -cf source.tar kernel
-git -C kernel diff --cached >from-upstream.patch
+git -C kernel diff --binary --cached >from-upstream.patch
 zstd -T0 --long --ultra -22 --progress --rm source.tar from-upstream.patch

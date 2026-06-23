@@ -1,4 +1,4 @@
-From 9d9eb439c9b3143f94580edc805877de942c1548 Mon Sep 17 00:00:00 2001
+From e4ed5bddc7d60361a523161ed2b80dbe6720b63c Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
 Date: Sun, 3 May 2026 15:24:11 +0800
 Subject: [PATCH] Enable in tree build
@@ -14,7 +14,7 @@ Subject: [PATCH] Enable in tree build
  create mode 100644 kernel-open/Kconfig
 
 diff --git a/.gitignore b/.gitignore
-index 75434ed..2e9be49 100644
+index 75434ed8..2e9be494 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -3,3 +3,4 @@
@@ -24,7 +24,7 @@ index 75434ed..2e9be49 100644
 +!linux.symvers
 diff --git a/copy-builtin b/copy-builtin
 new file mode 100755
-index 0000000..7a53fe8
+index 00000000..7a53fe85
 --- /dev/null
 +++ b/copy-builtin
 @@ -0,0 +1,30 @@
@@ -59,7 +59,7 @@ index 0000000..7a53fe8
 +sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
 +echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
 diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
-index 089c77d..c779103 100644
+index c593417e..a1826684 100644
 --- a/kernel-open/Kbuild
 +++ b/kernel-open/Kbuild
 @@ -2,6 +2,36 @@
@@ -109,7 +109,7 @@ index 089c77d..c779103 100644
 +ccflags-y += -I$(realpath $(src))
  ccflags-y += -Wall $(DEFINES) $(INCLUDES) -Wno-cast-qual -Wno-format-extra-args
  ccflags-y += -D__KERNEL__ -DMODULE -DNVRM
- ccflags-y += -DNV_VERSION_STRING=\"595.71.05\"
+ ccflags-y += -DNV_VERSION_STRING=\"610.43.02\"
 @@ -207,11 +237,13 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
  # file, which is included in the compile test preamble.
  #
@@ -180,7 +180,7 @@ index 089c77d..c779103 100644
 +	    cp -s "$(src)/nvidia-modeset/nv-modeset-kernel.o_binary" "$(obj)/nvidia-modeset/nv-modeset-kernel.o_binary"
 diff --git a/kernel-open/Kconfig b/kernel-open/Kconfig
 new file mode 100644
-index 0000000..c3747b7
+index 00000000..c3747b76
 --- /dev/null
 +++ b/kernel-open/Kconfig
 @@ -0,0 +1,47 @@
@@ -232,7 +232,7 @@ index 0000000..c3747b7
 +      Allows third-party devices (like InfiniBand NICs) to directly access
 +      GPU memory via RDMA.
 diff --git a/kernel-open/conftest.sh b/kernel-open/conftest.sh
-index cb4da27..2826bf9 100755
+index 386b3242..600f0513 100755
 --- a/kernel-open/conftest.sh
 +++ b/kernel-open/conftest.sh
 @@ -15,7 +15,6 @@ XEN_PRESENT=1
@@ -263,5 +263,5 @@ index cb4da27..2826bf9 100755
          # ------
          #
 -- 
-2.52.0
+2.54.0
 
