@@ -32,7 +32,6 @@ jobs:
       - name: Run build script
         run: |
           mkdir build && cd build
-          export MAKEOPTS="-j $(expr "$(nproc)" '+' 4) --load-average $(expr "$(nproc)" '+' 1)"
           SKIP_TEST=1 ../build-kernel-src
           mv cl-kernel.tar.zst ../source.tar.zst
           mv cl-kernel.patch.zst ../from-upstream.patch.zst

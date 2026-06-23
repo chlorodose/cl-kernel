@@ -5,6 +5,10 @@ export LLVM=1 && export LLVM_IAS=1
 SOURCE_DIR="$(dirname "$(realpath "$0")")/source"
 FILES_DIR="$(dirname "$(realpath "$0")")/files"
 
+if [ -z "$MAKEOPTS" ]; then
+    export MAKEOPTS="-j $(expr "$(nproc)" '+' 4) --load-average $(expr "$(nproc)" '+' 1)"
+fi
+
 # Install Kernel
 rm -rf kernel && git clone "$SOURCE_DIR"/kernel kernel && pushd kernel
     PATCH_LIST="
