@@ -1,22 +1,21 @@
-From 45f36801a117e96c63eeddc1dee238b889b6fad6 Mon Sep 17 00:00:00 2001
+From a766940513e3e40549b8d3167f2e2acfe100c7be Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
-Date: Wed, 25 Feb 2026 14:34:05 +0800
-Subject: [PATCH] bcachefs: fix security labels support
+Date: Tue, 23 Jun 2026 12:14:12 +0800
+Subject: [PATCH 1/2] bcachefs: fix security labels support
 
-Init security labels when creating inodes.
 ---
- fs/bcachefs/fs/namei.c      |   6 +-
- fs/bcachefs/fs/namei.h      |   2 +
- fs/bcachefs/fs/xattr.c      | 108 +++++++++++++++++++----
- fs/bcachefs/fs/xattr.h      |  20 +++++
- fs/bcachefs/init/recovery.c |   2 +-
- fs/bcachefs/vfs/fs.c        | 165 +++++++++++++++++++++---------------
- 6 files changed, 213 insertions(+), 90 deletions(-)
+ fs/fs/namei.c      |   6 +-
+ fs/fs/namei.h      |   2 +
+ fs/fs/xattr.c      | 108 ++++++++++++++++++++++++++------
+ fs/fs/xattr.h      |  20 ++++++
+ fs/init/recovery.c |   2 +-
+ fs/vfs/fs.c        | 152 ++++++++++++++++++++++++++-------------------
+ 6 files changed, 206 insertions(+), 84 deletions(-)
 
-diff --git a/fs/bcachefs/fs/namei.c b/fs/bcachefs/fs/namei.c
-index cf9b41d12c622..f0ddc5f70d022 100644
---- a/fs/bcachefs/fs/namei.c
-+++ b/fs/bcachefs/fs/namei.c
+diff --git a/fs/fs/namei.c b/fs/fs/namei.c
+index 6c066f4..044ea8e 100644
+--- a/fs/fs/namei.c
++++ b/fs/fs/namei.c
 @@ -8,7 +8,6 @@
  #include "fs/dirent.h"
  #include "fs/inode.h"
@@ -25,7 +24,7 @@ index cf9b41d12c622..f0ddc5f70d022 100644
  
  #include "init/fs.h"
  
-@@ -37,6 +36,7 @@ int bch2_create_trans(struct btree_trans *trans,
+@@ -38,6 +37,7 @@ int bch2_create_trans(struct btree_trans *trans,
  		      uid_t uid, gid_t gid, umode_t mode, dev_t rdev,
  		      struct posix_acl *default_acl,
  		      struct posix_acl *acl,
@@ -33,7 +32,7 @@ index cf9b41d12c622..f0ddc5f70d022 100644
  		      subvol_inum snapshot_src,
  		      unsigned flags)
  {
-@@ -128,6 +128,10 @@ int bch2_create_trans(struct btree_trans *trans,
+@@ -135,6 +135,10 @@ int bch2_create_trans(struct btree_trans *trans,
  
  		if (acl)
  			try(bch2_set_acl_trans(trans, new_inum, new_inode, acl, ACL_TYPE_ACCESS));
@@ -44,10 +43,10 @@ index cf9b41d12c622..f0ddc5f70d022 100644
  	}
  
  	if (!(flags & BCH_CREATE_TMPFILE)) {
-diff --git a/fs/bcachefs/fs/namei.h b/fs/bcachefs/fs/namei.h
-index 25c89deff4766..71fc965ed27eb 100644
---- a/fs/bcachefs/fs/namei.h
-+++ b/fs/bcachefs/fs/namei.h
+diff --git a/fs/fs/namei.h b/fs/fs/namei.h
+index 76577b6..a39ea76 100644
+--- a/fs/fs/namei.h
++++ b/fs/fs/namei.h
 @@ -3,6 +3,7 @@
  #define _BCACHEFS_NAMEI_H
  
@@ -56,7 +55,7 @@ index 25c89deff4766..71fc965ed27eb 100644
  
  struct posix_acl;
  
-@@ -18,6 +19,7 @@ int bch2_create_trans(struct btree_trans *, subvol_inum,
+@@ -19,6 +20,7 @@ int bch2_create_trans(struct btree_trans *, subvol_inum,
  		      uid_t, gid_t, umode_t, dev_t,
  		      struct posix_acl *,
  		      struct posix_acl *,
@@ -64,10 +63,10 @@ index 25c89deff4766..71fc965ed27eb 100644
  		      subvol_inum, unsigned);
  
  int bch2_link_trans(struct btree_trans *,
-diff --git a/fs/bcachefs/fs/xattr.c b/fs/bcachefs/fs/xattr.c
-index 40207856b8832..268f90dbeb849 100644
---- a/fs/bcachefs/fs/xattr.c
-+++ b/fs/bcachefs/fs/xattr.c
+diff --git a/fs/fs/xattr.c b/fs/fs/xattr.c
+index e2f34f4..0378914 100644
+--- a/fs/fs/xattr.c
++++ b/fs/fs/xattr.c
 @@ -18,6 +18,7 @@
  #include <linux/dcache.h>
  #include <linux/posix_acl_xattr.h>
@@ -117,7 +116,7 @@ index 40207856b8832..268f90dbeb849 100644
  int bch2_xattr_set(struct btree_trans *trans, subvol_inum inum,
  		   struct bch_inode_unpacked *inode_u,
  		   const char *name, const void *value, size_t size,
-@@ -190,24 +225,7 @@ int bch2_xattr_set(struct btree_trans *trans, subvol_inum inum,
+@@ -191,24 +226,7 @@ int bch2_xattr_set(struct btree_trans *trans, subvol_inum inum,
  	int ret;
  	if (value) {
  		struct bkey_i_xattr *xattr;
@@ -143,7 +142,7 @@ index 40207856b8832..268f90dbeb849 100644
  
  		ret = bch2_hash_set(trans, bch2_xattr_hash_desc, &hash_info,
  			      inum, &xattr->k_i,
-@@ -227,6 +245,60 @@ int bch2_xattr_set(struct btree_trans *trans, subvol_inum inum,
+@@ -228,6 +246,60 @@ int bch2_xattr_set(struct btree_trans *trans, subvol_inum inum,
  	return ret;
  }
  
@@ -204,10 +203,10 @@ index 40207856b8832..268f90dbeb849 100644
  struct xattr_buf {
  	char		*buf;
  	size_t		len;
-diff --git a/fs/bcachefs/fs/xattr.h b/fs/bcachefs/fs/xattr.h
-index 919341ca37e70..f166033252760 100644
---- a/fs/bcachefs/fs/xattr.h
-+++ b/fs/bcachefs/fs/xattr.h
+diff --git a/fs/fs/xattr.h b/fs/fs/xattr.h
+index c571476..5207dfd 100644
+--- a/fs/fs/xattr.h
++++ b/fs/fs/xattr.h
 @@ -3,6 +3,8 @@
  #define _BCACHEFS_XATTR_H
  
@@ -240,12 +239,12 @@ index 919341ca37e70..f166033252760 100644
 +	kfree(sec_xattrs.xattrs);
 +}
  #endif /* _BCACHEFS_XATTR_H */
-diff --git a/fs/bcachefs/init/recovery.c b/fs/bcachefs/init/recovery.c
-index fa670c5dc76d6..737160da06727 100644
---- a/fs/bcachefs/init/recovery.c
-+++ b/fs/bcachefs/init/recovery.c
-@@ -1091,7 +1091,7 @@ int bch2_fs_initialize(struct bch_fs *c)
- 				  &root_inode, &lostfound_inode,
+diff --git a/fs/init/recovery.c b/fs/init/recovery.c
+index 75f8242..0e36d8e 100644
+--- a/fs/init/recovery.c
++++ b/fs/init/recovery.c
+@@ -1103,7 +1103,7 @@ int bch2_fs_initialize(struct bch_fs *c)
+ 				  &root_inode, &lostfound_inode, &new_subvol,
  				  &lostfound,
  				  0, 0, S_IFDIR|0700, 0,
 -				  NULL, NULL, (subvol_inum) { 0 }, 0));
@@ -253,31 +252,25 @@ index fa670c5dc76d6..737160da06727 100644
  	bch_err_msg(c, ret, "creating lost+found");
  	if (ret)
  		return ret;
-diff --git a/fs/bcachefs/vfs/fs.c b/fs/bcachefs/vfs/fs.c
-index bf15be32475cd..44699bcbe77f5 100644
---- a/fs/bcachefs/vfs/fs.c
-+++ b/fs/bcachefs/vfs/fs.c
-@@ -560,11 +560,12 @@ __bch2_create(struct mnt_idmap *idmap,
+diff --git a/fs/vfs/fs.c b/fs/vfs/fs.c
+index 79fa19a..ff15675 100644
+--- a/fs/vfs/fs.c
++++ b/fs/vfs/fs.c
+@@ -584,6 +584,7 @@ __bch2_create(struct mnt_idmap *idmap,
  	struct bch_inode_info *inode;
  	struct bch_inode_unpacked inode_u;
  	struct posix_acl *default_acl = NULL, *acl = NULL;
 +	struct bch_security_xattrs sec_xattrs;
  	subvol_inum inum;
  	struct bch_subvolume subvol;
- 	u64 journal_seq = 0;
--	kuid_t kuid;
--	kgid_t kgid;
-+	kuid_t kuid = mapped_fsuid(idmap, i_user_ns(&dir->v));
-+	kgid_t kgid = mapped_fsgid(idmap, i_user_ns(&dir->v));
- 	int ret;
- 
- 	/*
-@@ -573,94 +574,118 @@ __bch2_create(struct mnt_idmap *idmap,
- 	 */
- 	ret = posix_acl_create(&dir->v, &mode, &default_acl, &acl);
- 	if (ret)
--		return ERR_PTR(ret);
-+		goto acl_fail;
+ 	kuid_t kuid = mapped_fsuid(idmap, i_user_ns(&dir->v));
+@@ -598,93 +599,116 @@ __bch2_create(struct mnt_idmap *idmap,
+ 	if (is_posixacl) {
+ 		ret = posix_acl_create(&dir->v, &mode, &default_acl, &acl);
+ 		if (ret)
+-			return ERR_PTR(ret);
++			goto acl_fail;
+ 	}
  
  	inode = __bch2_new_inode(c, GFP_NOFS);
  	if (unlikely(!inode)) {
@@ -292,9 +285,14 @@ index bf15be32475cd..44699bcbe77f5 100644
  
 -	if (!(flags & BCH_CREATE_TMPFILE))
 -		mutex_lock(&dir->ei_update_lock);
-+	/*
+ 	/*
+-	 * posix_acl_create() calls get_acl -> btree transaction, don't start
+-	 * ours until after, ei->update_lock must also be taken first:
 +	 * Prefill some field of inode so security modules will be able to read them.
-+	 */
+ 	 */
+-	CLASS(btree_trans, trans)(c);
+-retry:
+-	bch2_trans_begin(trans);
 +	inode->v.i_uid = kuid;
 +	inode->v.i_gid = kgid;
 +	inode->v.i_mode = mode;
@@ -306,14 +304,8 @@ index bf15be32475cd..44699bcbe77f5 100644
 +		  		&dentry->d_name);
 +	if (ret)
 +		goto lsm_fail;
-+
- 	/*
- 	 * posix_acl_create() calls get_acl -> btree transaction, don't start
- 	 * ours until after, ei->update_lock must also be taken first:
- 	 */
--	CLASS(btree_trans, trans)(c);
--retry:
--	bch2_trans_begin(trans);
+ 
+-	ret   = bch2_create_trans(trans,
 +	{
 +		/* transaction zone */
 +		if (!(flags & BCH_CREATE_TMPFILE))
@@ -323,45 +315,31 @@ index bf15be32475cd..44699bcbe77f5 100644
 +		do {
 +			bch2_trans_begin(trans);
 +
-+			ret   = bch2_subvol_is_ro_trans(trans, dir->ei_inum.subvol) ?:
-+				bch2_create_trans(trans,
-+						  inode_inum(dir), &dir_u, &inode_u,
-+						  !(flags & BCH_CREATE_TMPFILE)
-+						  ? &dentry->d_name : NULL,
-+						  from_kuid(i_user_ns(&dir->v), kuid),
-+						  from_kgid(i_user_ns(&dir->v), kgid),
-+						  mode, rdev,
-+						  default_acl, acl, &sec_xattrs, snapshot_src, flags) ?:
-+				bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, 1,
-+						KEY_TYPE_QUOTA_PREALLOC);
-+			if(unlikely(ret))
-+				continue;
- 
--	kuid = mapped_fsuid(idmap, i_user_ns(&dir->v));
--	kgid = mapped_fsgid(idmap, i_user_ns(&dir->v));
--	ret   = bch2_subvol_is_ro_trans(trans, dir->ei_inum.subvol) ?:
--		bch2_create_trans(trans,
--				  inode_inum(dir), &dir_u, &inode_u,
--				  !(flags & BCH_CREATE_TMPFILE)
--				  ? &dentry->d_name : NULL,
--				  from_kuid(i_user_ns(&dir->v), kuid),
--				  from_kgid(i_user_ns(&dir->v), kgid),
--				  mode, rdev,
++			ret = bch2_create_trans(trans,
+ 				  inode_inum(dir), &dir_u, &inode_u, &subvol,
+ 				  !(flags & BCH_CREATE_TMPFILE)
+ 				  ? &dentry->d_name : NULL,
+ 				  from_kuid(i_user_ns(&dir->v), kuid),
+ 				  from_kgid(i_user_ns(&dir->v), kgid),
+ 				  mode, rdev,
 -				  default_acl, acl, snapshot_src, flags) ?:
 -		bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, 1,
 -				KEY_TYPE_QUOTA_PREALLOC);
 -	if (unlikely(ret))
 -		goto err_before_quota;
-+			inum.subvol = inode_u.bi_subvol ?: dir->ei_inum.subvol;
-+			inum.inum = inode_u.bi_inum;
++				  default_acl, acl, &sec_xattrs,
++				  snapshot_src, flags) ?:
++				bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, 1,
++					KEY_TYPE_QUOTA_PREALLOC);
++			if(unlikely(ret))
++				continue;
  
 -	inum.subvol = inode_u.bi_subvol ?: dir->ei_inum.subvol;
 -	inum.inum = inode_u.bi_inum;
-+			ret   = bch2_subvolume_get(trans, inum.subvol, true, &subvol) ?:
-+				bch2_trans_commit(trans, NULL, &journal_seq, 0);
++			inum.subvol = inode_u.bi_subvol ?: dir->ei_inum.subvol;
++			inum.inum 	= inode_u.bi_inum;
  
--	ret   = bch2_subvolume_get(trans, inum.subvol, true, &subvol) ?:
--		bch2_trans_commit(trans, NULL, &journal_seq, 0);
+-	ret = bch2_trans_commit(trans, NULL, NULL, 0);
 -	if (unlikely(ret)) {
 -		bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, -1,
 -				KEY_TYPE_QUOTA_WARN);
@@ -370,32 +348,33 @@ index bf15be32475cd..44699bcbe77f5 100644
 -			goto retry;
 -		goto err_trans;
 -	}
-+			if(unlikely(ret)) {
-+				bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, -1,
-+						KEY_TYPE_QUOTA_WARN);
-+				continue;
-+			}
++			ret = bch2_trans_commit(trans, NULL, NULL, 0);
  
 -	if (!(flags & BCH_CREATE_TMPFILE)) {
 -		bch2_inode_update_after_write(trans, dir, &dir_u,
 -					      ATTR_MTIME|ATTR_CTIME|ATTR_SIZE);
 -		mutex_unlock(&dir->ei_update_lock);
 -	}
++			if(unlikely(ret)) {
++				bch2_quota_acct(c, bch_qid(&inode_u), Q_INO, -1,
++					KEY_TYPE_QUOTA_WARN);
++				continue;
++			}
+ 
+-	bch2_vfs_inode_init(trans, inum, inode, &inode_u, &subvol);
 +			if (!(flags & BCH_CREATE_TMPFILE))
 +				bch2_inode_update_after_write(trans, dir, &dir_u,
 +						      ATTR_MTIME|ATTR_CTIME|ATTR_SIZE);
 +		}
 +		while(ret && bch2_err_matches(ret, BCH_ERR_transaction_restart));
  
--	bch2_vfs_inode_init(trans, inum, inode, &inode_u, &subvol);
+-	if (is_posixacl) {
+-		set_cached_acl(&inode->v, ACL_TYPE_ACCESS, acl);
+-		set_cached_acl(&inode->v, ACL_TYPE_DEFAULT, default_acl);
+-	}
 +		if (!(flags & BCH_CREATE_TMPFILE)) {
 +			mutex_unlock(&dir->ei_update_lock);
 +		}
- 
--	set_cached_acl(&inode->v, ACL_TYPE_ACCESS, acl);
--	set_cached_acl(&inode->v, ACL_TYPE_DEFAULT, default_acl);
-+		if(unlikely(ret))
-+			goto trans_fail;
  
 -	/*
 -	 * we must insert the new inode into the inode cache before calling
@@ -412,26 +391,41 @@ index bf15be32475cd..44699bcbe77f5 100644
 -	 */
 -	inode = bch2_inode_hash_insert(c, NULL, inode);
 -err:
+-	posix_acl_release(default_acl);
+-	posix_acl_release(acl);
+-	return inode;
+-err_trans:
+-	if (!(flags & BCH_CREATE_TMPFILE))
+-		mutex_unlock(&dir->ei_update_lock);
++		if(unlikely(ret))
++			goto trans_fail;
 +		bch2_vfs_inode_init(trans, inum, inode, &inode_u, &subvol);
-+
-+		set_cached_acl(&inode->v, ACL_TYPE_ACCESS, acl);
-+		set_cached_acl(&inode->v, ACL_TYPE_DEFAULT, default_acl);
+ 
+-	make_bad_inode(&inode->v);
+-	iput(&inode->v);
+-	inode = ERR_PTR(ret);
+-	goto err;
++		if (is_posixacl) {
++			set_cached_acl(&inode->v, ACL_TYPE_ACCESS, acl);
++			set_cached_acl(&inode->v, ACL_TYPE_DEFAULT, default_acl);
++		}
 +
 +		/*
-+		 * we must insert the new inode into the inode cache before calling
-+		 * bch2_trans_exit() and dropping locks, else we could race with another
-+		 * thread pulling the inode in and modifying it:
-+		 *
-+		 * also, calling bch2_inode_hash_insert() without passing in the
-+		 * transaction object is sketchy - if we could ever end up in
-+		 * __wait_on_freeing_inode(), we'd risk deadlock.
-+		 *
-+		 * But that shouldn't be possible, since we still have the inode locked
-+		 * that we just created, and we _really_ can't take a transaction
-+		 * restart here.
-+		 */
++		* we must insert the new inode into the inode cache before calling
++		* bch2_trans_exit() and dropping locks, else we could race with another
++		* thread pulling the inode in and modifying it:
++		*
++		* also, calling bch2_inode_hash_insert() without passing in the
++		* transaction object is sketchy - if we could ever end up in
++		* __wait_on_freeing_inode(), we'd risk deadlock.
++		*
++		* But that shouldn't be possible, since we still have the inode locked
++		* that we just created, and we _really_ can't take a transaction
++		* restart here.
++		*/
 +		inode = bch2_inode_hash_insert(c, NULL, inode);
 +	}
++
 +trans_fail:
 +	bch2_free_security_xattrs(sec_xattrs);
 +lsm_fail:
@@ -440,25 +434,17 @@ index bf15be32475cd..44699bcbe77f5 100644
 +		iput(&inode->v);
 +	}
 +inode_fail:
- 	posix_acl_release(default_acl);
- 	posix_acl_release(acl);
++ 	posix_acl_release(default_acl);
++ 	posix_acl_release(acl);
 +acl_fail:
 +	if(unlikely(ret)) {
 +		return ERR_PTR(ret);
 +	}
- 	return inode;
--err_trans:
--	if (!(flags & BCH_CREATE_TMPFILE))
--		mutex_unlock(&dir->ei_update_lock);
--
--	make_bad_inode(&inode->v);
--	iput(&inode->v);
--	inode = ERR_PTR(ret);
--	goto err;
++ 	return inode;
  }
  
  /* methods */
-@@ -998,7 +1023,7 @@ static int bch2_rename2(struct mnt_idmap *idmap,
+@@ -1147,7 +1171,7 @@ retry:
  					from_kuid(i_user_ns(&src_dir->v), current_fsuid()),
  					from_kgid(i_user_ns(&src_dir->v), current_fsgid()),
  					S_IFCHR|WHITEOUT_MODE, 0,
@@ -467,3 +453,6 @@ index bf15be32475cd..44699bcbe77f5 100644
  		      bch2_quota_acct(c, bch_qid(whiteout_inode_u), Q_INO, 1,
  				      KEY_TYPE_QUOTA_PREALLOC);
  		if (unlikely(ret))
+-- 
+2.54.0
+

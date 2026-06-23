@@ -15,4 +15,4 @@
 	url = https://gitlab.com/xanmod/linux-patches.git
 [submodule "source/bcachefs"]
 	path = source/bcachefs
-	url = https://github.com/koverstreet/bcachefs.git
+	url = https://github.com/koverstreet/bcachefs-tools.git

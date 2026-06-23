@@ -9,11 +9,17 @@ if [ -z "$MAKEOPTS" ]; then
     export MAKEOPTS="-j $(expr "$(nproc)" '+' 4) --load-average $(expr "$(nproc)" '+' 1)"
 fi
 
+clone() {
+    cp -r --reflink=auto "$1" "$2"
+    rm -f "$2"/.git
+    cp -rL --reflink=auto "$1"/.git "$2"/.git
+}
+
 # Install Kernel
-rm -rf kernel && git clone "$SOURCE_DIR"/kernel kernel && pushd kernel
+rm -rf kernel && clone "$SOURCE_DIR"/kernel kernel && pushd kernel
     PATCH_LIST="
-        $(find "$SOURCE_DIR"/xanmod/linux-7.0.y-xanmod -type f -name '*.patch' | grep -v -f "$FILES_DIR"/xanmod/patch.blacklist | sort)
-        $(ls "$SOURCE_DIR"/cachy/7.0/misc/{0001-aufs*.patch,0001-clang-polly.patch})
+        $(find "$SOURCE_DIR"/xanmod/linux-7.1.y-xanmod -type f -name '*.patch' | grep -v -f "$FILES_DIR"/xanmod/patch.blacklist | sort)
+        $(ls "$SOURCE_DIR"/cachy/7.1/misc/{0001-aufs*,0001-clang-polly}.patch)
         $FILES_DIR/cachy/0001-Fixup-aufs-m-missing-symbols.patch
     "
     for PATCH in $PATCH_LIST; do
@@ -32,7 +38,7 @@ popd
 KERNEL_DIR="$(realpath kernel)"
 
 # Install NVIDIA
-rm -rf nvidia && git clone "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
+rm -rf nvidia && clone "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
     PATCH_LIST="
         $(find "$SOURCE_DIR"/cachy/7.1/misc/nvidia -type f -name '*.patch' | grep -v -f "$FILES_DIR"/cachy/nvidia-patch.blacklist  | sort)
         $FILES_DIR/nvidia/0001-Enable-in-tree-build.patch
@@ -45,7 +51,7 @@ rm -rf nvidia && git clone "$SOURCE_DIR"/nvidia nvidia && pushd nvidia
 popd
 
 # Install zfs
-rm -rf zfs && git clone "$SOURCE_DIR"/zfs zfs && pushd zfs
+rm -rf zfs && clone "$SOURCE_DIR"/zfs zfs && pushd zfs
     sed -i 's/CDDL/GPL/g' META # Evil, i know...
     sed -i 's/\/Kbuild//g' module/.gitignore
     echo >include/.gitignore
@@ -56,9 +62,9 @@ rm -rf zfs && git clone "$SOURCE_DIR"/zfs zfs && pushd zfs
 popd
 
 # Install bcachefs
-rm -rf bcachefs && git clone "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
+rm -rf bcachefs && clone "$SOURCE_DIR"/bcachefs bcachefs && pushd bcachefs
     PATCH_LIST="
-        $FILES_DIR/bcachefs/0001-Fix-security-labels-support.patch
+        $FILES_DIR/bcachefs/*.patch
     "
     for PATCH in $PATCH_LIST; do
         echo "Patching: $PATCH" >&2
@@ -72,8 +78,8 @@ pushd kernel
     make mrproper
     make olddefconfig
     ./scripts/config \
-        --module ZFS \
-        --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
+	--module ZFS \
+        --enable UNICODE --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
         --enable PCI --enable DRM --enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE --enable ZONE_DEVICE --enable DEVICE_PRIVATE --module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
     if [ ! -z "$TEST_CONFIG_PATH" ]; then
         cat "$TEST_CONFIG_PATH" >.config

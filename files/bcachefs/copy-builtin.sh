@@ -12,7 +12,7 @@ if ! [ -d "$1" ] ; then
 fi
 KERNEL_DIR="$(realpath "$1")"
 
-cp -r fs/bcachefs "$KERNEL_DIR"/fs/bcachefs
+cp -r fs "$KERNEL_DIR"/fs/bcachefs
 
 sed -i '/source "fs\/ext2\/Kconfig\"/i\source "fs/bcachefs/Kconfig"' "$KERNEL_DIR/fs/Kconfig"
 echo 'obj-$(CONFIG_BCACHEFS_FS) += bcachefs/' >> "$KERNEL_DIR/fs/Makefile"
