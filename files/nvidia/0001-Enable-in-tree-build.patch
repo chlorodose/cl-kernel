@@ -1,4 +1,4 @@
-From e4ed5bddc7d60361a523161ed2b80dbe6720b63c Mon Sep 17 00:00:00 2001
+From 9602254149cafca29994013cbae682e6935e09d2 Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
 Date: Sun, 3 May 2026 15:24:11 +0800
 Subject: [PATCH] Enable in tree build
@@ -59,7 +59,7 @@ index 00000000..7a53fe85
 +sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
 +echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
 diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
-index c593417e..a1826684 100644
+index 9b37fc7d..85553186 100644
 --- a/kernel-open/Kbuild
 +++ b/kernel-open/Kbuild
 @@ -2,6 +2,36 @@
@@ -109,7 +109,7 @@ index c593417e..a1826684 100644
 +ccflags-y += -I$(realpath $(src))
  ccflags-y += -Wall $(DEFINES) $(INCLUDES) -Wno-cast-qual -Wno-format-extra-args
  ccflags-y += -D__KERNEL__ -DMODULE -DNVRM
- ccflags-y += -DNV_VERSION_STRING=\"610.43.02\"
+ ccflags-y += -DNV_VERSION_STRING=\"610.43.03\"
 @@ -207,11 +237,13 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
  # file, which is included in the compile test preamble.
  #
@@ -263,5 +263,5 @@ index 386b3242..600f0513 100755
          # ------
          #
 -- 
-2.54.0
+2.55.0
 

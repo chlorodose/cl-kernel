@@ -12,7 +12,7 @@
 	url = https://github.com/CachyOS/kernel-patches.git
 [submodule "source/xanmod"]
 	path = source/xanmod
-	url = https://gitlab.com/xanmod/linux-patches.git
+	url = https://gitlab.com/xanmod/linux.git
 [submodule "source/bcachefs"]
 	path = source/bcachefs
 	url = https://github.com/koverstreet/bcachefs-tools.git

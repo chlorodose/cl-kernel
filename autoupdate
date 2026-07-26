@@ -8,16 +8,17 @@ git -C xanmod fetch --depth 1 origin master
 git -C xanmod reset --hard origin/master
 
 TAG="$(curl -fsSL https://api.github.com/repos/NVIDIA/open-gpu-kernel-modules/releases/latest | jq -r '.tag_name')"
-git -C nvidia fetch --depth 1 origin "refs/tags/${TAG}:refs/tags/${TAG}"
-git -C nvidia reset --hard "${TAG}"
+git -C nvidia fetch --depth 1 origin tag "$TAG"
+git -C nvidia reset --hard "$TAG"
 
 TAG="$(curl -fsSL https://api.github.com/repos/openzfs/zfs/releases/latest | jq -r '.tag_name')"
-git -C zfs fetch --depth 1 origin "refs/tags/${TAG}:refs/tags/${TAG}"
-git -C zfs reset --hard "${TAG}"
+git -C zfs fetch --depth 1 origin tag "$TAG"
+git -C zfs reset --hard "$TAG"
 
 TAG="$(curl -fsSL https://api.github.com/repos/koverstreet/bcachefs-tools/tags | jq -r '.[0].name')"
-git -C bcachefs fetch --depth 1 origin "refs/tags/${TAG}:refs/tags/${TAG}"
-git -C bcachefs reset --hard "${TAG}"
+git -C bcachefs fetch --depth 1 origin tag "$TAG"
+git -C bcachefs reset --hard "$TAG"
 
-# Linux kernel
-# Manually update
+TAG="v$(curl -fsSL https://www.kernel.org/releases.json | jq -r .latest_stable.version)"
+git -C kernel fetch --depth 1 origin tag "$TAG"
+git -C kernel reset --hard "$TAG"
