@@ -1,4 +1,4 @@
-From 9602254149cafca29994013cbae682e6935e09d2 Mon Sep 17 00:00:00 2001
+From d0ceac2f33eaf690bd905ecdd8acd43ad1894532 Mon Sep 17 00:00:00 2001
 From: chlorodose <chlorodose@chlorodose.me>
 Date: Sun, 3 May 2026 15:24:11 +0800
 Subject: [PATCH] Enable in tree build
@@ -17,9 +17,7 @@ diff --git a/.gitignore b/.gitignore
 index 75434ed8..2e9be494 100644
 --- a/.gitignore
 +++ b/.gitignore
-@@ -3,3 +3,4 @@
- *.o.cmd
- *.o.d
+@@ -5 +5,2 @@
  _out/
 +!linux.symvers
 diff --git a/copy-builtin b/copy-builtin
@@ -59,12 +57,10 @@ index 00000000..7a53fe85
 +sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
 +echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
 diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
-index 9b37fc7d..85553186 100644
+index d1811c6a..8952f99d 100644
 --- a/kernel-open/Kbuild
 +++ b/kernel-open/Kbuild
-@@ -2,6 +2,36 @@
- # Kbuild file for NVIDIA Linux GPU driver kernel modules
- ###########################################################################
+@@ -4,2 +4,32 @@
  
 +export IGNORE_MISSING_MODULE_SYMVERS := 1
 +export IGNORE_CC_MISMATCH := 1
@@ -97,22 +93,14 @@ index 9b37fc7d..85553186 100644
 +endif
 +
  #
- # The parent makefile is expected to define:
- #
-@@ -75,8 +105,8 @@ $(foreach _module, $(NV_KERNEL_MODULES), \
-  $(eval include $(src)/$(_module)/$(_module).Kbuild))
- 
+@@ -77,4 +107,4 @@ $(foreach _module, $(NV_KERNEL_MODULES), \
  
 -ccflags-y += -I$(src)/common/inc
 -ccflags-y += -I$(src)
 +ccflags-y += -I$(realpath $(src))/common/inc
 +ccflags-y += -I$(realpath $(src))
  ccflags-y += -Wall $(DEFINES) $(INCLUDES) -Wno-cast-qual -Wno-format-extra-args
- ccflags-y += -D__KERNEL__ -DMODULE -DNVRM
- ccflags-y += -DNV_VERSION_STRING=\"610.43.03\"
-@@ -207,11 +237,13 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
- # file, which is included in the compile test preamble.
- #
+@@ -209,7 +239,9 @@ NV_CONFTEST_HEADERS += $(NV_CONFTEST_COMPILE_TEST_HEADERS)
  
 -$(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
 +quiet_cmd_conftest	= CONFTEST	 $(notdir $*)
@@ -126,31 +114,19 @@ index 9b37fc7d..85553186 100644
 -	 $(notdir $*) > $@
 +	$(call if_changed,conftest)
  
- #
- # Concatenate a conftest/*.h header from its constituent compile test headers
-@@ -221,7 +253,8 @@ $(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
- #
- 
+@@ -223,3 +255,4 @@ $(obj)/conftest/compile-tests/%.h: $(NV_CONFTEST_SCRIPT) $(NV_CONFTEST_HEADER)
  define NV_GENERATE_COMPILE_TEST_HEADER
 - $(obj)/conftest/$(1).h: $(addprefix $(obj)/conftest/compile-tests/,$(addsuffix .h,$(2)))
 +targets += $(addprefix conftest/compile-tests/,$(addsuffix .h,$(2)))
 +$(obj)/conftest/$(1).h: $(addprefix $(obj)/conftest/compile-tests/,$(addsuffix .h,$(2)))
  	@mkdir -p $(obj)/conftest
- 	@# concatenate /dev/null to prevent cat from hanging when $$^ is empty
- 	@cat $$^ /dev/null > $$@
-@@ -268,8 +301,7 @@ $(foreach header,$(NV_HEADER_PRESENCE_TESTS),$(eval $(call NV_HEADER_PRESENCE_CH
- $(obj)/conftest/headers.h: $(call NV_HEADER_PRESENCE_PART,$(NV_HEADER_PRESENCE_TESTS))
- 	@cat $^ > $@
+@@ -270,4 +303,3 @@ $(obj)/conftest/headers.h: $(call NV_HEADER_PRESENCE_PART,$(NV_HEADER_PRESENCE_T
  
 -clean-dirs := $(obj)/conftest
 -
 +clean-files += conftest nv_compiler.h
  
- # For any object files that depend on conftest, declare the dependency here.
- $(addprefix $(obj)/,$(NV_OBJECTS_DEPEND_ON_CONFTEST)): | $(NV_CONFTEST_HEADERS)
-@@ -305,3 +337,29 @@ $(obj)/conftest/uts_release: NV_GENERATE_UTS_RELEASE
- .PHONY: NV_GENERATE_UTS_RELEASE
- 
+@@ -307 +339,27 @@ $(obj)/conftest/uts_release: NV_GENERATE_UTS_RELEASE
  $(NV_CONFTEST_HEADERS): $(obj)/conftest/uts_release
 +
 +$(obj)/linux.symvers:
@@ -232,36 +208,24 @@ index 00000000..c3747b76
 +      Allows third-party devices (like InfiniBand NICs) to directly access
 +      GPU memory via RDMA.
 diff --git a/kernel-open/conftest.sh b/kernel-open/conftest.sh
-index 386b3242..600f0513 100755
+index c318c52f..037bb3cb 100755
 --- a/kernel-open/conftest.sh
 +++ b/kernel-open/conftest.sh
-@@ -15,7 +15,6 @@ XEN_PRESENT=1
- PREEMPT_RT_PRESENT=0
- 
+@@ -17,3 +17,2 @@ PREEMPT_RT_PRESENT=0
  NVIDIA_OOT_PATH="/usr/src/nvidia/nvidia-public"
 -MODULE_SYMVERS_PATHS="$OUTPUT/Module.symvers"
  
- # Also search in out-of-tree Module.symvers on Tegra
- if [ -d ${NVIDIA_OOT_PATH} ]; then
-@@ -103,7 +102,6 @@ test_header_presence() {
- build_cflags() {
-     ISYSTEM=`$CC -print-file-name=include 2> /dev/null`
+@@ -105,3 +104,2 @@ build_cflags() {
      BASE_CFLAGS="-O2 -D__KERNEL__ \
 --DKBUILD_BASENAME=\"#conftest$$\" -DKBUILD_MODNAME=\"#conftest$$\" \
  -nostdinc -isystem $ISYSTEM \
- -Wno-implicit-function-declaration -Wno-strict-prototypes"
- 
-@@ -335,6 +333,10 @@ check_symbol_exists() {
-     TAB='	'
- 
+@@ -337,2 +335,6 @@ check_symbol_exists() {
      if [ ${OS_FREEBSD} -ne 1 ] ; then
 +        if [ ! -f "$MODULE_SYMVERS_PATHS" ]; then
 +            echo "Symvers file not found" >&2
 +            exit 1
 +        fi
          # Linux:
-         # ------
-         #
 -- 
 2.55.0
 

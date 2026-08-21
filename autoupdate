@@ -1,24 +1,25 @@
 #!/bin/sh
 set -e
+DEPTH=100
 cd "$(dirname "$0")/source"
 
-git -C cachy fetch --depth 1 origin master
+git -C cachy fetch --depth "$DEPTH" origin master
 git -C cachy reset --hard origin/master
-git -C xanmod fetch --depth 1 origin master
-git -C xanmod reset --hard origin/master
 
 TAG="$(curl -fsSL https://api.github.com/repos/NVIDIA/open-gpu-kernel-modules/releases/latest | jq -r '.tag_name')"
-git -C nvidia fetch --depth 1 origin tag "$TAG"
+git -C nvidia fetch --depth "$DEPTH" origin tag "$TAG"
 git -C nvidia reset --hard "$TAG"
 
 TAG="$(curl -fsSL https://api.github.com/repos/openzfs/zfs/releases/latest | jq -r '.tag_name')"
-git -C zfs fetch --depth 1 origin tag "$TAG"
+git -C zfs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C zfs reset --hard "$TAG"
 
 TAG="$(curl -fsSL https://api.github.com/repos/koverstreet/bcachefs-tools/tags | jq -r '.[0].name')"
-git -C bcachefs fetch --depth 1 origin tag "$TAG"
+git -C bcachefs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C bcachefs reset --hard "$TAG"
 
-TAG="v$(curl -fsSL https://www.kernel.org/releases.json | jq -r .latest_stable.version)"
-git -C kernel fetch --depth 1 origin tag "$TAG"
-git -C kernel reset --hard "$TAG"
+TAG="$(curl -fsSL https://www.kernel.org/releases.json | jq -r '.releases.[] | select(.moniker == "stable") | .version')"
+git -C kernel fetch --depth "$DEPTH" origin tag "v$TAG"
+git -C kernel reset --hard "v$TAG"
+git -C xanmod fetch --depth "$DEPTH" origin tag "$TAG-xanmod1"
+git -C xanmod reset --hard "$TAG-xanmod1"
