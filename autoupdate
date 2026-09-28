@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -ex
 DEPTH=100
 cd "$(dirname "$0")/source"
 
@@ -18,7 +18,7 @@ TAG="$(curl -fsSL https://api.github.com/repos/koverstreet/bcachefs-tools/tags |
 git -C bcachefs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C bcachefs reset --hard "$TAG"
 
-TAG="$(curl -fsSL https://www.kernel.org/releases.json | jq -r '.releases.[] | select(.moniker == "stable") | .version')"
+TAG="$(curl -fsSL https://www.kernel.org/releases.json | jq -r '.releases.[] | select(.moniker == "stable") | .version' | head -n 1)"
 git -C kernel fetch --depth "$DEPTH" origin tag "v$TAG"
 git -C kernel reset --hard "v$TAG"
 git -C xanmod fetch --depth "$DEPTH" origin tag "$TAG-xanmod1"
