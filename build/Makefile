@@ -1,5 +1,3 @@
-KVER := "7.1"
-
 LLVM 		?= 1
 LLVM_IAS	?= 1
 export LLVM
@@ -18,7 +16,7 @@ TEST_KCONFIG ?= ./scripts/config \
 
 ROOT		:= $(realpath ..)
 
-FOR_START	= rm -rf _$@ && git clone $(ROOT)/source/$@ _$@
+FOR_START	= rm -rf _$@ && git -C $(ROOT)/source/$@ worktree add --force --detach "$$PWD/_$@" HEAD
 FOR_END		= mv _$@ $@
 GIT_APPLY	= git -C _$@ apply --rej
 MAKE_IN		= make -C _$@
@@ -30,7 +28,7 @@ default: source.tar from-upstream.patch
 	zstd -T0 --long --ultra -22 --progress source.tar from-upstream.patch
 
 base:
-	rm -rf _$@ && git clone ../source/kernel _$@
+	rm -rf _$@ && git -C ../source/kernel worktree add --force --detach "$$PWD/_$@" HEAD
 	$(MAKE_IN) defconfig
 	$(CD_AND) $(TEST_KCONFIG)
 	$(MAKE_IN) olddefconfig
@@ -67,7 +65,7 @@ xanmod: base
 kernel: base xanmod bcachefs zfs nvidia
 	rm -rf _$@ && cp -a --reflink=auto base _$@
 	git -C _$@ apply ../xanmod/xanmod-all.diff
-	cd bcachefs && bash $(ROOT)/files/bcachefs/copy-builtin.sh ../_$@
+	cd bcachefs && bash ./scripts/install-to-kernel.sh ../_$@
 	cd zfs && ./copy-builtin ../_$@
 	cd nvidia && ./copy-builtin ../_$@
 	$(MAKE_IN) mrproper

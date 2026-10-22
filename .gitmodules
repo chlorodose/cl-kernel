@@ -1,6 +1,6 @@
 [submodule "source/kernel"]
 	path = source/kernel
-	url = https://github.com/torvalds/linux.git
+	url = https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
 [submodule "source/zfs"]
 	path = source/zfs
 	url = https://github.com/openzfs/zfs.git

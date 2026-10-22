@@ -6,7 +6,7 @@ cd "$(dirname "$0")/source"
 git -C cachy fetch --depth "$DEPTH" origin master
 git -C cachy reset --hard origin/master
 
-TAG="$(curl -fsSL https://api.github.com/repos/NVIDIA/open-gpu-kernel-modules/releases/latest | jq -r '.tag_name')"
+TAG="$(LC_ALL=C dnf info nvidia-open | grep 'Available packages' -A 16 | grep Version | cut -d ':' -f 2 | xargs)"
 git -C nvidia fetch --depth "$DEPTH" origin tag "$TAG"
 git -C nvidia reset --hard "$TAG"
 
