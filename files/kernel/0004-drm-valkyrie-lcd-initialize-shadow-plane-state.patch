@@ -1,0 +1,15 @@
+diff --git a/drivers/gpu/drm/tiny/valkyrie-lcd.c b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+--- a/drivers/gpu/drm/tiny/valkyrie-lcd.c
++++ b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+@@ -590,6 +590,11 @@ static int vk_init_drm(struct vk_driver *drv)
+ 	if (ret)
+ 		return ret;
+ 
++	/* Linux 7.3's shadow-plane helper still uses the legacy reset hook. */
++	drm_gem_reset_shadow_plane(&drv->plane);
++	if (!drv->plane.state)
++		return -ENOMEM;
++
+ 	return drm_mode_config_create_initial_state(drm);
+ }
+ 

@@ -1,0 +1,13 @@
+diff --git a/drivers/gpu/drm/tiny/valkyrie-lcd.c b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+--- a/drivers/gpu/drm/tiny/valkyrie-lcd.c
++++ b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+@@ -434,7 +434,8 @@ static void vk_timeout_atomic_submit(struct work_struct *work)
+ 		return;
+ 
+ 	if (ret)
+-		drm_warn_ratelimited(crtc->dev, "Timeout refresh commit failed: %d\n", ret);
++		dev_warn_ratelimited(crtc->dev->dev,
++				     "[drm] Timeout refresh commit failed: %d\n", ret);
+ }
+ 
+ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,

@@ -12,7 +12,13 @@ TEST_KCONFIG ?= ./scripts/config \
 	--enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE \
 	--enable ZONE_DEVICE --enable DEVICE_PRIVATE \
 	--module ZFS \
-	--module BCACHEFS_FS --enable BCACHEFS_QUOTA \
+	--module AUFS_FS --enable AUFS_BRANCH_MAX_1023 \
+	--enable AUFS_HNOTIFY --enable AUFS_HFSNOTIFY \
+	--enable EXPORTFS --enable AUFS_EXPORT --enable AUFS_XATTR \
+	--enable AUFS_RDU --enable AUFS_DIRREN --enable AUFS_SHWH \
+	--module FUSE_FS --enable AUFS_BR_FUSE --module BLK_DEV_LOOP \
+	--enable AUFS_FHSM --enable AUFS_BR_RAMFS --disable AUFS_DEBUG \
+	--enable RUST --module BCACHEFS_FS --enable BCACHEFS_QUOTA \
 	--module NVIDIA --module NVIDIA_MODESET --module NVIDIA_DRM --module NVIDIA_UVM --module NVIDIA_PEERMEM
 
 ROOT		:= $(realpath ..)
@@ -22,6 +28,9 @@ FOR_END		= mv _$@ $@
 GIT_APPLY	= git -C _$@ apply --rej
 MAKE_IN		= make -C _$@
 CD_AND		= cd _$@ &&
+
+KVER		= $(shell make -s -C $(ROOT)/source/kernel kernelversion)
+KVER_SUB	= $(shell echo $(KVER) | cut -d. -f1,2)
 
 .PHONY: default
 default: source.tar from-upstream.patch
@@ -39,8 +48,8 @@ base:
 nvidia:
 	$(FOR_START)
 	$(GIT_APPLY) \
-		$(ROOT)/source/cachy/7.2/misc/nvidia/0002-fix-dsc-correct-RC-parameter-tables-to-match-VESA-DS.patch \
-		$(ROOT)/files/nvidia/0001-Enable-in-tree-build.patch
+		$(ROOT)/files/nvidia/0001-Enable-in-tree-build.patch \
+		$(ROOT)/files/nvidia/0002-Pass-dmem-cgroup-init-to-register-region.patch
 	$(FOR_END)
 
 gpu-unlock:
@@ -72,9 +81,13 @@ xanmod: base
 kernel: base xanmod bcachefs zfs nvidia gpu-unlock
 	rm -rf _$@ && cp -a --reflink=auto base _$@
 	git -C _$@ apply ../xanmod/xanmod-all.diff
+	git -C _$@ apply $(ROOT)/source/cachy/$(KVER_SUB)/misc/0001-aufs*.patch
+	git -C _$@ apply $(ROOT)/files/cachy/0001-Fixup-aufs-m-missing-symbols.patch
+	git -C _$@ apply $(ROOT)/files/kernel/0003-aufs-fix-error-path-initialization.patch
 	b4 am -o . -n _kernel-mail 20261028174425.21704-1-ziaowang2007@gmail.com
 	git -C _$@ apply ../_kernel-mail.mbx
-	git -C _$@ apply $(ROOT)/files/kernel/0001-drm-valkyrie-lcd-adapt-to-linux-7.2.patch
+	git -C _$@ apply $(ROOT)/files/kernel/0002-drm-valkyrie-lcd-fix-ratelimited-warning.patch
+	git -C _$@ apply $(ROOT)/files/kernel/0004-drm-valkyrie-lcd-initialize-shadow-plane-state.patch
 	rm -f _kernel-mail.mbx _kernel-mail.cover
 	cd bcachefs && bash ./scripts/install-to-kernel.sh ../_$@
 	cd zfs && ./copy-builtin ../_$@

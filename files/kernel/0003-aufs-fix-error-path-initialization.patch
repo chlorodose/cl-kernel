@@ -1,0 +1,35 @@
+diff --git a/fs/aufs/whout.c b/fs/aufs/whout.c
+--- a/fs/aufs/whout.c
++++ b/fs/aufs/whout.c
+@@ -441,7 +441,7 @@ out:
+  */
+ int au_wh_init(struct au_branch *br, struct super_block *sb)
+ {
+-	int err, i, need_drop;
++	int err, i, need_drop = 0;
+ 	const unsigned char do_plink
+ 		= !!au_opt_test(au_mntflags(sb), PLINK);
+ 	struct inode *h_dir;
+@@ -496,7 +496,6 @@ int au_wh_init(struct au_branch *br, struct super_block *sb)
+ 			wbr->wbr_wh[i] = NULL;
+ 		}
+ 
+-	need_drop = 0;
+ 	err = vfsub_mnt_want_write(path.mnt);
+ 	if (unlikely(err))
+ 		goto out_err;
+diff --git a/fs/aufs/xino.c b/fs/aufs/xino.c
+--- a/fs/aufs/xino.c
++++ b/fs/aufs/xino.c
+@@ -248,8 +248,10 @@ struct file *au_xino_create2(struct super_block *sb, const struct path *base,
+ 
+ 	path.mnt = base->mnt;
+ 	err = vfsub_mnt_want_write(path.mnt);
+-	if (unlikely(err))
++	if (unlikely(err)) {
++		file = ERR_PTR(err);
+ 		goto out_dput;
++	}
+ 
+ 	err = vfs_create(mnt_idmap(base->mnt), path.dentry, 0666, NULL);
+ 	if (unlikely(err)) {
