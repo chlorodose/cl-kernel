@@ -51,11 +51,11 @@ index 00000000..7a53fe85
 +done
 +cp "$SYMVER" linux.symvers
 +
-+cp -r . "$KERNEL_DIR"/drivers/video/nvidia && rm -rf "$KERNEL_DIR"/drivers/video/nvidia/.git
-+printf '!.*\n!*\n' | cat - .gitignore >"$KERNEL_DIR"/drivers/video/nvidia/.gitignore
++cp -r . "$KERNEL_DIR"/drivers/gpu/drm/nvidia && rm -rf "$KERNEL_DIR"/drivers/gpu/drm/nvidia/.git
++printf '!.*\n!*\n' | cat - .gitignore >"$KERNEL_DIR"/drivers/gpu/drm/nvidia/.gitignore
 +
-+sed -i '/source "drivers\/gpu\/nova-core\/Kconfig"/a source "drivers/video/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/video/Kconfig
-+echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/video/Makefile
++sed -i '/source "drivers\/gpu\/drm\/nouveau\/Kconfig"/a source "drivers/gpu/drm/nvidia/kernel-open/Kconfig"' "$KERNEL_DIR"/drivers/gpu/drm/Kconfig
++echo 'obj-$(CONFIG_NVIDIA)		  += nvidia/kernel-open/' >> "$KERNEL_DIR"/drivers/gpu/drm/Makefile
 diff --git a/kernel-open/Kbuild b/kernel-open/Kbuild
 index d1811c6a..8952f99d 100644
 --- a/kernel-open/Kbuild

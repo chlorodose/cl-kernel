@@ -8,6 +8,7 @@ SUBMAKEOPTS	?= -j $(shell expr $(shell nproc) + 4) --load-average $(shell expr $
 TEST_KCONFIG ?= ./scripts/config \
 	--enable UNICODE \
 	--enable PCI --enable DRM \
+	--module DRM_VALKYRIE_LCD \
 	--enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE \
 	--enable ZONE_DEVICE --enable DEVICE_PRIVATE \
 	--module ZFS \
@@ -65,6 +66,10 @@ xanmod: base
 kernel: base xanmod bcachefs zfs nvidia
 	rm -rf _$@ && cp -a --reflink=auto base _$@
 	git -C _$@ apply ../xanmod/xanmod-all.diff
+	b4 am -o . -n _kernel-mail 20261028174425.21704-1-ziaowang2007@gmail.com
+	git -C _$@ apply ../_kernel-mail.mbx
+	git -C _$@ apply $(ROOT)/files/kernel/0001-drm-valkyrie-lcd-adapt-to-linux-7.2.patch
+	rm -f _kernel-mail.mbx _kernel-mail.cover
 	cd bcachefs && bash ./scripts/install-to-kernel.sh ../_$@
 	cd zfs && ./copy-builtin ../_$@
 	cd nvidia && ./copy-builtin ../_$@

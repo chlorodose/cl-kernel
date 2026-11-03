@@ -14,7 +14,7 @@ TAG="$(curl -fsSL https://api.github.com/repos/openzfs/zfs/releases/latest | jq 
 git -C zfs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C zfs reset --hard "$TAG"
 
-TAG="$(curl -fsSL https://api.github.com/repos/koverstreet/bcachefs-tools/tags | jq -r '.[0].name')"
+TAG="v1.39.6"
 git -C bcachefs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C bcachefs reset --hard "$TAG"
 

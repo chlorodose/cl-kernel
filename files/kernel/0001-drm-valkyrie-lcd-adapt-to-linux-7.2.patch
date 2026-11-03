@@ -1,0 +1,342 @@
+diff --git a/drivers/gpu/drm/tiny/valkyrie-lcd.c b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+index 6271fba2031f..ea6eb2604cbc 100644
+--- a/drivers/gpu/drm/tiny/valkyrie-lcd.c
++++ b/drivers/gpu/drm/tiny/valkyrie-lcd.c
+@@ -221,7 +221,7 @@ struct vk_crtc_driver {
+ static const struct drm_crtc_funcs vk_crtc_funcs = {
+ 	.set_config = drm_atomic_helper_set_config,
+ 	.page_flip = drm_atomic_helper_page_flip,
+-	.atomic_create_state = drm_atomic_helper_crtc_create_state,
++	.reset = drm_atomic_helper_crtc_reset,
+ 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+ 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
+ 	DRM_CRTC_VBLANK_TIMER_FUNCS
+@@ -262,7 +262,7 @@ struct vk_connector_driver {
+ };
+ 
+ static const struct drm_connector_funcs vk_connector_funcs = {
+-	.atomic_create_state = drm_atomic_helper_connector_create_state,
++	.reset = drm_atomic_helper_connector_reset,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+ 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state
+@@ -293,13 +293,12 @@ static int vk_plane_atomic_check(struct drm_plane *plane,
+ 	int ret;
+ 
+ 	if (new_plane_state->crtc)
+-		new_crtc_state = drm_atomic_get_new_crtc_state(state, new_plane_state->crtc);
++		new_crtc_state = drm_atomic_get_new_crtc_state(
++			state, new_plane_state->crtc);
+ 
+-	ret = drm_atomic_helper_check_plane_state(new_plane_state,
+-						  new_crtc_state,
+-						  DRM_PLANE_NO_SCALING,
+-						  DRM_PLANE_NO_SCALING, false,
+-						  false);
++	ret = drm_atomic_helper_check_plane_state(
++		new_plane_state, new_crtc_state, DRM_PLANE_NO_SCALING,
++		DRM_PLANE_NO_SCALING, false, false);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -315,13 +314,10 @@ static enum drm_mode_status
+ vk_crtc_mode_valid(struct drm_crtc *crtc, const struct drm_display_mode *mode)
+ {
+ 	struct vk_driver *drv = container_of(crtc->dev, struct vk_driver, drm);
+-	struct drm_display_mode preferred = {
+-		DRM_MODE_INIT(drv->device_info->fps,
+-			      drv->device_info->width,
+-			      drv->device_info->height,
+-			      drv->device_info->width_mm,
+-			      drv->device_info->height_mm)
+-	};
++	struct drm_display_mode preferred = { DRM_MODE_INIT(
++		drv->device_info->fps, drv->device_info->width,
++		drv->device_info->height, drv->device_info->width_mm,
++		drv->device_info->height_mm) };
+ 
+ 	return drm_crtc_helper_mode_valid_fixed(crtc, mode, &preferred);
+ }
+@@ -342,8 +338,9 @@ static int vk_crtc_atomic_check(struct drm_crtc *crtc,
+ 	if (new_crtc_state->plane_mask != drm_plane_mask(plane) ||
+ 	    new_crtc_state->connector_mask !=
+ 		    drm_connector_mask(&connector_drv->connector)) {
+-		drm_dbg_kms(crtc->dev,
+-			    "Active CRTC requires the primary plane and USB connector\n");
++		drm_dbg_kms(
++			crtc->dev,
++			"Active CRTC requires the primary plane and USB connector\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -355,8 +352,9 @@ static int vk_crtc_atomic_check(struct drm_crtc *crtc,
+ 		return 0;
+ 
+ 	if (!new_plane_state->fb) {
+-		drm_dbg_kms(crtc->dev,
+-			    "Active CRTC has no framebuffer on its primary plane\n");
++		drm_dbg_kms(
++			crtc->dev,
++			"Active CRTC has no framebuffer on its primary plane\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -377,21 +375,17 @@ static int vk_connector_get_modes(struct drm_connector *connector)
+ {
+ 	struct vk_connector_driver *drv =
+ 		container_of(connector, struct vk_connector_driver, connector);
+-	struct drm_display_mode mode = {
+-		DRM_MODE_INIT(drv->device_info->fps,
+-			      drv->device_info->width,
+-			      drv->device_info->height,
+-			      drv->device_info->width_mm,
+-			      drv->device_info->height_mm)
+-	};
++	struct drm_display_mode mode = { DRM_MODE_INIT(
++		drv->device_info->fps, drv->device_info->width,
++		drv->device_info->height, drv->device_info->width_mm,
++		drv->device_info->height_mm) };
+ 	return drm_connector_helper_get_modes_fixed(connector, &mode);
+ }
+ 
+ static void vk_timeout_atomic_submit(struct work_struct *work)
+ {
+-	struct vk_crtc_driver *crtc_drv =
+-		container_of(to_delayed_work(work), struct vk_crtc_driver,
+-			     timeout_flush);
++	struct vk_crtc_driver *crtc_drv = container_of(
++		to_delayed_work(work), struct vk_crtc_driver, timeout_flush);
+ 	struct drm_crtc *crtc = &crtc_drv->crtc;
+ 	struct drm_device *drm = crtc->dev;
+ 	struct drm_modeset_acquire_ctx ctx;
+@@ -434,7 +428,7 @@ static void vk_timeout_atomic_submit(struct work_struct *work)
+ 		return;
+ 
+ 	if (ret)
+-		drm_warn_ratelimited(crtc->dev, "Timeout refresh commit failed: %d\n", ret);
++		drm_warn(crtc->dev, "Timeout refresh commit failed: %d\n", ret);
+ }
+ 
+ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+@@ -464,8 +458,9 @@ static void vk_crtc_atomic_flush(struct drm_crtc *crtc,
+ 	if (!drm_dev_enter(crtc->dev, &enter_idx))
+ 		goto drm_fail;
+ 	if (!vk_io_start(drv)) {
+-		drm_dbg_ratelimited(crtc->dev,
+-				    "Skipping CRTC update while display I/O is blocked\n");
++		drm_dbg_ratelimited(
++			crtc->dev,
++			"Skipping CRTC update while display I/O is blocked\n");
+ 		goto vkio_fail;
+ 	}
+ 
+@@ -482,8 +477,9 @@ static void vk_crtc_atomic_flush(struct drm_crtc *crtc,
+ 		bool enabling = !drv->device_state;
+ 
+ 		/* Testing found a ~10-second timeout; refresh every 3 seconds. */
+-		mod_delayed_work(system_dfl_wq, &crtc_drv->timeout_flush,
+-				 msecs_to_jiffies(VK_TIMEOUT_FLUSH_INTERVAL_MS));
++		mod_delayed_work(
++			system_dfl_wq, &crtc_drv->timeout_flush,
++			msecs_to_jiffies(VK_TIMEOUT_FLUSH_INTERVAL_MS));
+ 		if (enabling)
+ 			ret = vk_device_enable_pre(drv);
+ 		if (ret)
+@@ -589,7 +585,8 @@ static int vk_init_drm(struct vk_driver *drv)
+ 	if (ret)
+ 		return ret;
+ 
+-	return drm_mode_config_create_initial_state(drm);
++	drm_mode_config_reset(drm);
++	return 0;
+ }
+ 
+ static int vk_init_usb(struct vk_driver *drv, struct usb_interface *intf)
+@@ -719,8 +716,9 @@ static void vk_disconnect(struct usb_interface *intf)
+ 		drm_dbg_driver(&drv->drm,
+ 			       "Display reset during disconnect failed: %d\n",
+ 			       ret);
+-	drm_dbg_driver(&drv->drm,
+-		       "Device watchdog reset may take approximately 10 seconds\n");
++	drm_dbg_driver(
++		&drv->drm,
++		"Device watchdog reset may take approximately 10 seconds\n");
+ 	mutex_unlock(&drv->io_lock);
+ 	vk_deinit_usb(drv);
+ }
+@@ -765,8 +763,9 @@ static int __vk_resume_device(struct usb_interface *intf, bool reidentify)
+ 			drm_err(&drv->drm, "Failed to restore DRM state: %d\n",
+ 				ret);
+ 	} else {
+-		drm_dbg_driver(&drv->drm,
+-			       "No saved DRM state; scheduling an immediate refresh\n");
++		drm_dbg_driver(
++			&drv->drm,
++			"No saved DRM state; scheduling an immediate refresh\n");
+ 		schedule_delayed_work(&drv->crtc->timeout_flush, 0);
+ 	}
+ 
+@@ -834,13 +833,12 @@ static int vk_post_reset(struct usb_interface *intf)
+ 	return __vk_resume_device(intf, true);
+ }
+ 
+-static void
+-__vk_conv_to_buf(struct vk_send_chunk *curr,
+-		 struct drm_shadow_plane_state *plane_state, size_t *i,
+-		 unsigned long *x, unsigned long *y,
+-		 const struct vk_lcd_device_info *device_info,
+-		 const struct drm_format_info *src_format_info,
+-		 const struct drm_format_info *dst_format_info)
++static void __vk_conv_to_buf(struct vk_send_chunk *curr,
++			     struct drm_shadow_plane_state *plane_state,
++			     size_t *i, unsigned long *x, unsigned long *y,
++			     const struct vk_lcd_device_info *device_info,
++			     const struct drm_format_info *src_format_info,
++			     const struct drm_format_info *dst_format_info)
+ {
+ 	struct drm_rect clip;
+ 	struct iosys_map dst;
+@@ -851,8 +849,7 @@ __vk_conv_to_buf(struct vk_send_chunk *curr,
+ 		       buf_avail = DIV_ROUND_DOWN_ULL(VK_SEND_BUF_SIZE - *i,
+ 						      dst_format_info->cpp[0]);
+ 		/* UYVY encodes pixels in pairs, so round down to an even count. */
+-		size_t pixs_to_send = ALIGN_DOWN(min(line_avail, buf_avail),
+-						 2);
++		size_t pixs_to_send = ALIGN_DOWN(min(line_avail, buf_avail), 2);
+ 		size_t bytes_to_send = pixs_to_send * dst_format_info->cpp[0];
+ 
+ 		if (!bytes_to_send)
+@@ -924,9 +921,8 @@ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+ 	struct drm_device *drm = crtc_drv->crtc.dev;
+ 	struct drm_framebuffer *fb = plane_state->base.fb;
+ 	const struct drm_format_info *src_format_info = fb->format;
+-	const struct drm_format_info *dst_format_info =
+-		drm_get_format_info(drm, VK_FRAME_FORMAT,
+-				    DRM_FORMAT_MOD_LINEAR);
++	const struct drm_format_info *dst_format_info = drm_get_format_info(
++		drm, VK_FRAME_FORMAT, DRM_FORMAT_MOD_LINEAR);
+ 	unsigned long x = 0, y = 0;
+ 	const unsigned long wait_timeout =
+ 		msecs_to_jiffies(VK_SEND_CHUNK_TIMEOUT);
+@@ -944,9 +940,10 @@ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+ 
+ 	ret = drm_gem_fb_begin_cpu_access(fb, DMA_FROM_DEVICE);
+ 	if (ret) {
+-		drm_dbg_ratelimited(drm,
+-				    "Failed to begin CPU access to framebuffer %u: %d\n",
+-				    fb->base.id, ret);
++		drm_dbg_ratelimited(
++			drm,
++			"Failed to begin CPU access to framebuffer %u: %d\n",
++			fb->base.id, ret);
+ 		return ret;
+ 	}
+ 
+@@ -980,18 +977,20 @@ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+ 				  __vk_urb_finish_callback, NULL);
+ 		ret = __vk_wait_chunk_complete(next, wait_timeout);
+ 		if (ret) {
+-			drm_dbg_ratelimited(drm,
+-					    "Bulk OUT transfer failed (%d/%d bytes): %d\n",
+-					    next->urb.actual_length,
+-					    next->urb.transfer_buffer_length, ret);
++			drm_dbg_ratelimited(
++				drm,
++				"Bulk OUT transfer failed (%d/%d bytes): %d\n",
++				next->urb.actual_length,
++				next->urb.transfer_buffer_length, ret);
+ 			break;
+ 		}
+ 		reinit_completion(&curr->flight);
+ 		ret = usb_submit_urb(&curr->urb, GFP_KERNEL);
+ 		if (ret) {
+-			drm_dbg_ratelimited(drm,
+-					    "Failed to submit bulk OUT transfer (%zu bytes): %d\n",
+-					    i, ret);
++			drm_dbg_ratelimited(
++				drm,
++				"Failed to submit bulk OUT transfer (%zu bytes): %d\n",
++				i, ret);
+ 			curr->errno = ret;
+ 			complete_all(&curr->flight);
+ 			break;
+@@ -999,9 +998,10 @@ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+ 	}
+ 	ret2 = __vk_wait_chunk_complete(curr, wait_timeout);
+ 	if (ret2)
+-		drm_dbg_ratelimited(drm, "Last frame chunk failed (%d/%d bytes): %d\n",
+-				    curr->urb.actual_length,
+-				    curr->urb.transfer_buffer_length, ret2);
++		drm_dbg_ratelimited(
++			drm, "Last frame chunk failed (%d/%d bytes): %d\n",
++			curr->urb.actual_length,
++			curr->urb.transfer_buffer_length, ret2);
+ 	ret = ret ? ret : ret2;
+ 
+ 	/* The device expects a zero-length bulk transfer to terminate each frame. */
+@@ -1011,7 +1011,8 @@ static int vk_scan_frame(struct vk_crtc_driver *crtc_drv,
+ 			  __vk_urb_finish_callback, NULL);
+ 	ret2 = usb_submit_urb(&curr->urb, GFP_KERNEL);
+ 	if (ret2) {
+-		drm_dbg_ratelimited(drm, "Failed to submit frame terminator: %d\n", ret2);
++		drm_dbg_ratelimited(
++			drm, "Failed to submit frame terminator: %d\n", ret2);
+ 		curr->errno = ret2;
+ 		complete_all(&curr->flight);
+ 	}
+@@ -1049,10 +1050,11 @@ static int vk_feature_report(struct vk_driver *drv, const u8 request[8],
+ 	}
+ 
+ 	if (response) {
+-		ret = usb_control_msg_recv(drv->dev, 0, HID_REQ_GET_REPORT,
+-					   USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+-					   HID_REPORT_TYPE_FEATURE << 8, 0, response, 8,
+-					   USB_CTRL_GET_TIMEOUT, GFP_KERNEL);
++		ret = usb_control_msg_recv(
++			drv->dev, 0, HID_REQ_GET_REPORT,
++			USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
++			HID_REPORT_TYPE_FEATURE << 8, 0, response, 8,
++			USB_CTRL_GET_TIMEOUT, GFP_KERNEL);
+ 		if (ret)
+ 			drm_dbg_ratelimited(&drv->drm,
+ 					    "GET_REPORT for %8ph failed: %d\n",
+@@ -1075,9 +1077,10 @@ static inline int vk_b5_read(struct vk_driver *drv, u16 addr, u8 *val)
+ 		return ret;
+ 
+ 	if (memcmp(buf, ans, 3)) {
+-		drm_dbg_ratelimited(&drv->drm,
+-				    "Unexpected response reading register %#06x: %8ph\n",
+-				    addr, ans);
++		drm_dbg_ratelimited(
++			&drv->drm,
++			"Unexpected response reading register %#06x: %8ph\n",
++			addr, ans);
+ 		return -EIO;
+ 	}
+ 
+@@ -1184,9 +1187,10 @@ static inline int vk_a604_switch(struct vk_driver *drv, bool on)
+ 		if (ret)
+ 			return ret;
+ 		if (f242 & BIT(3)) {
+-			drm_warn_once(&drv->drm,
+-				      "Reads %#04x in register 0xf242, device maybe bugged\n",
+-				      f242);
++			drm_warn_once(
++				&drv->drm,
++				"Reads %#04x in register 0xf242, device maybe bugged\n",
++				f242);
+ 			return -EIO;
+ 		}
+ 	}
+@@ -1402,8 +1406,9 @@ static int vk_device_info_find_or_verify(struct vk_driver *drv)
+ 			   sizeof(label_f000)) ||
+ 		    memcmp(vk_lcd_devices[i].serial, serial, sizeof(serial))) {
+ 			if (drv->device_info) {
+-				drm_dbg_driver(&drv->drm,
+-					       "Panel identification changed after USB reset\n");
++				drm_dbg_driver(
++					&drv->drm,
++					"Panel identification changed after USB reset\n");
+ 				return -ENODEV;
+ 			}
+ 		} else {
