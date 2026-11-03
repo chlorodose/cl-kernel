@@ -8,7 +8,7 @@ SUBMAKEOPTS	?= -j $(shell expr $(shell nproc) + 4) --load-average $(shell expr $
 TEST_KCONFIG ?= ./scripts/config \
 	--enable UNICODE \
 	--enable PCI --enable DRM \
-	--module DRM_VALKYRIE_LCD \
+	--module DRM_VALKYRIE_LCD --module NVIDIA_GPU_UNLOCK \
 	--enable MEMORY_HOTPLUG --enable MEMORY_HOTREMOVE \
 	--enable ZONE_DEVICE --enable DEVICE_PRIVATE \
 	--module ZFS \
@@ -43,6 +43,12 @@ nvidia:
 		$(ROOT)/files/nvidia/0001-Enable-in-tree-build.patch
 	$(FOR_END)
 
+gpu-unlock:
+	$(FOR_START)
+	$(GIT_APPLY) \
+		$(ROOT)/files/gpu-unlock/0001-Add-kernel-builtin.patch
+	$(FOR_END)
+
 zfs: base
 	$(FOR_START)
 	$(CD_AND) sed -i 's/CDDL/GPL/' META # Do some evil thing
@@ -63,7 +69,7 @@ xanmod: base
 	$(CD_AND) git diff $$(git -C ../base rev-parse HEAD) >xanmod-all.diff
 	$(FOR_END)
 
-kernel: base xanmod bcachefs zfs nvidia
+kernel: base xanmod bcachefs zfs nvidia gpu-unlock
 	rm -rf _$@ && cp -a --reflink=auto base _$@
 	git -C _$@ apply ../xanmod/xanmod-all.diff
 	b4 am -o . -n _kernel-mail 20261028174425.21704-1-ziaowang2007@gmail.com
@@ -73,6 +79,7 @@ kernel: base xanmod bcachefs zfs nvidia
 	cd bcachefs && bash ./scripts/install-to-kernel.sh ../_$@
 	cd zfs && ./copy-builtin ../_$@
 	cd nvidia && ./copy-builtin ../_$@
+	cd gpu-unlock/kernel && ./copy-builtin ../../_$@
 	$(MAKE_IN) mrproper
 	git -C _$@ clean -Xdf
 	$(MAKE_IN) defconfig

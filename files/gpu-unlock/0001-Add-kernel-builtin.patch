@@ -1,0 +1,88 @@
+From 4223c1df69e6a72fe54658f5d3532271f9b01f0c Mon Sep 17 00:00:00 2001
+From: chlorodose <chlorodose@chlorodose.me>
+Date: Tue, 3 Nov 2026 21:59:25 +0800
+Subject: [PATCH] Add kernel builtin
+
+---
+ kernel/copy-builtin        | 29 +++++++++++++++++++++++++++++
+ kernel/gpu_unlock/Kbuild   |  3 ++-
+ kernel/gpu_unlock/Kconfig  |  5 +++++
+ kernel/gpu_unlock/Makefile |  6 ------
+ 4 files changed, 36 insertions(+), 7 deletions(-)
+ create mode 100755 kernel/copy-builtin
+ create mode 100644 kernel/gpu_unlock/Kconfig
+ delete mode 100644 kernel/gpu_unlock/Makefile
+
+diff --git a/kernel/copy-builtin b/kernel/copy-builtin
+new file mode 100755
+index 0000000..a06347f
+--- /dev/null
++++ b/kernel/copy-builtin
+@@ -0,0 +1,29 @@
++#!/bin/sh
++
++set -ef
++
++usage()
++{
++	echo "usage: $0 <kernel source tree>" >&2
++	exit 1
++}
++
++if ! [ -d "$1" ] ; then
++	usage
++fi
++KERNEL_DIR="$(realpath "$1")"
++cd "$(dirname "$0")"
++
++for F in Module.symvers vmlinux.symvers; do
++    P="$KERNEL_DIR/$F"
++    if [ -f "$P" ]; then
++        SYMVER="$P"
++    fi
++done
++cp "$SYMVER" linux.symvers
++
++cp -r ./gpu_unlock "$KERNEL_DIR"/drivers/gpu/drm/nvidia-gpu-unlock && rm -rf "$KERNEL_DIR"/drivers/gpu/drm/nvidia-gpu-unlock/.git
++
++sed -i '/source "drivers\/gpu\/drm\/nouveau\/Kconfig"/a source "drivers/gpu/drm/nvidia-gpu-unlock/Kconfig"' "$KERNEL_DIR"/drivers/gpu/drm/Kconfig
++echo 'obj-$(CONFIG_NVIDIA_GPU_UNLOCK)		  += nvidia-gpu-unlock/' >> "$KERNEL_DIR"/drivers/gpu/drm/Makefile
++    
+\ No newline at end of file
+diff --git a/kernel/gpu_unlock/Kbuild b/kernel/gpu_unlock/Kbuild
+index c0ce572..eff6c2b 100644
+--- a/kernel/gpu_unlock/Kbuild
++++ b/kernel/gpu_unlock/Kbuild
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+-obj-m += gpu_unlock.o
++ccflags-y += -Wno-unused-variable -Wno-unused-but-set-variable
++obj-$(CONFIG_NVIDIA_GPU_UNLOCK) += gpu_unlock.o
+ gpu_unlock-y := main.o gfw_eval.o prep_610.o layout_610.o \
+ 	vbios_610.o recipes.o payload.o firmware_610.o falcon.o unlock_610.o
+diff --git a/kernel/gpu_unlock/Kconfig b/kernel/gpu_unlock/Kconfig
+new file mode 100644
+index 0000000..792710a
+--- /dev/null
++++ b/kernel/gpu_unlock/Kconfig
+@@ -0,0 +1,5 @@
++config NVIDIA_GPU_UNLOCK
++    tristate "NVIDIA GPU opensource driver (GSP RM)"
++    depends on NVIDIA
++    help
++      Ampere pre-driver hardware unlock
+diff --git a/kernel/gpu_unlock/Makefile b/kernel/gpu_unlock/Makefile
+deleted file mode 100644
+index 1bccac4..0000000
+--- a/kernel/gpu_unlock/Makefile
++++ /dev/null
+@@ -1,6 +0,0 @@
+-# SPDX-License-Identifier: GPL-2.0-only
+-# Set KDIR to build for a kernel other than the running one.
+-KDIR ?= /lib/modules/$(shell uname -r)/build
+-.PHONY: all clean
+-all clean:
+-	$(MAKE) -C "$(KDIR)" M="$(CURDIR)" $(if $(filter clean,$@),clean,modules)
+-- 
+2.56.0
+

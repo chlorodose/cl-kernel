@@ -10,6 +10,9 @@ TAG="$(LC_ALL=C dnf info nvidia-open | grep 'Available packages' -A 16 | grep Ve
 git -C nvidia fetch --depth "$DEPTH" origin tag "$TAG"
 git -C nvidia reset --hard "$TAG"
 
+git -C gpu-unlock fetch --depth "$DEPTH" origin main
+git -C gpu-unlock reset --hard origin/main
+
 TAG="$(curl -fsSL https://api.github.com/repos/openzfs/zfs/releases/latest | jq -r '.tag_name')"
 git -C zfs fetch --depth "$DEPTH" origin tag "$TAG"
 git -C zfs reset --hard "$TAG"

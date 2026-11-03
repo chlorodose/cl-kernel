@@ -16,3 +16,6 @@
 [submodule "source/bcachefs"]
 	path = source/bcachefs
 	url = https://github.com/koverstreet/bcachefs-tools.git
+[submodule "source/gpu-unlock"]
+	path = source/gpu-unlock
+	url = https://github.com/Zagitta/gpu-unlock.git
